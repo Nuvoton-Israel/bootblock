@@ -78,6 +78,14 @@ void HAL_PrintRegs (void)
     DES_PrintRegs();
 #endif
 
+#if defined DP80_MODULE_TYPE
+    DP80_PrintRegs();
+#endif
+
+#if defined DWT_MODULE_TYPE
+    DWT_PrintRegs();
+#endif
+
 #if defined ECE_MODULE_TYPE
     ECE_PrintRegs();
 #endif
@@ -126,12 +134,20 @@ void HAL_PrintRegs (void)
     ITIM32_PrintRegs();
 #endif
 
+#if defined ITIM64_MODULE_TYPE
+    ITIM64_PrintRegs();
+#endif
+
 #if defined KBC_MODULE_TYPE
     KBC_PrintRegs();
 #endif
 
 #if defined KBSCAN_MODULE_TYPE
     KBSCAN_PrintRegs();
+#endif
+
+#if defined LCT_MODULE_TYPE
+    LCT_PrintRegs();
 #endif
 
 #if defined LFCG_MODULE_TYPE
@@ -206,10 +222,6 @@ void HAL_PrintRegs (void)
     SCS_PrintRegs();
 #endif
 
-#if defined DWT_MODULE_TYPE
-    DWT_PrintRegs();
-#endif
-
 #if defined SD_MODULE_TYPE
     SD_PrintRegs();
 #endif
@@ -224,10 +236,6 @@ void HAL_PrintRegs (void)
 
 #if defined SHM_MODULE_TYPE
     SHM_PrintRegs();
-#endif
-
-#if defined DP80_MODULE_TYPE
-    DP80_PrintRegs();
 #endif
 
 #if defined SIB_MODULE_TYPE
@@ -354,6 +362,14 @@ void HAL_PrintVersions (void)
     DES_PrintVersion();
 #endif
 
+#if defined DP80_MODULE_TYPE
+    DP80_PrintVersion();
+#endif
+
+#if defined DWT_MODULE_TYPE
+    DWT_PrintVersion();
+#endif
+
 #if defined ECE_MODULE_TYPE
     ECE_PrintVersion();
 #endif
@@ -398,12 +414,24 @@ void HAL_PrintVersions (void)
     ITIM8_PrintVersion();
 #endif
 
+#if defined ITIM32_MODULE_TYPE
+    ITIM32_PrintVersion();
+#endif
+
+#if defined ITIM64_MODULE_TYPE
+    ITIM64_PrintVersion();
+#endif
+
 #if defined KBC_MODULE_TYPE
     KBC_PrintVersion();
 #endif
 
 #if defined KBSCAN_MODULE_TYPE
     KBSCAN_PrintVersion();
+#endif
+
+#if defined LCT_MODULE_TYPE
+    LCT_PrintVersion();
 #endif
 
 #if defined LFCG_MODULE_TYPE
@@ -478,10 +506,6 @@ void HAL_PrintVersions (void)
     SCS_PrintVersion();
 #endif
 
-#if defined DWT_MODULE_TYPE
-    DWT_PrintVersion();
-#endif
-
 #if defined SD_MODULE_TYPE
     SD_PrintVersion();
 #endif
@@ -496,10 +520,6 @@ void HAL_PrintVersions (void)
 
 #if defined SHM_MODULE_TYPE
     SHM_PrintVersion();
-#endif
-
-#if defined DP80_MODULE_TYPE
-    DP80_PrintVersion();
 #endif
 
 #if defined SIB_MODULE_TYPE

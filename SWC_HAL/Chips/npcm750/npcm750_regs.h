@@ -585,6 +585,7 @@
 #define  INTCR3_eSPI_INT_POL             11 , 1              /* 11 eSPI_INT_POL (eSPI Interrupt Polarity). When set to 1, the interrupt polarity bit at index 71 of the selected      */
 #define  INTCR3_GMMAP                    8 , 3              /* 10-8 GMMAP (Graphics Memory Map). Configures Graphics core address mapping into main memory, according to             */
 #define  INTCR3_PCIeENHD                 7 , 1               /* 7 PCIeENHD (PCI Express Bridge Enhancement Disable).                                                                  */
+#define  INTCR3_FIU_FIX                  6 , 1               /* 6 FIU_FIX (Enables FIU FIX for long bursts). Enables the FIU to respond correctly to unaligned burst transactions and SPI RAM support. (See issue #506).     */
 #define  INTCR3_GFXACCDIS                4 , 1               /* 4 GFXACCDIS (Graphics Core Access Disable). Disables access to PCI configuration of the Graphics core.                */
 #define  INTCR3_HSRDIS                   2 , 1               /* 2 HSRDIS. Disables Host PCIe Secondary Reset to PCI devices. This bit added as an engineering feature.                */
 #define  INTCR3_BIOSEN                   1 , 1               /* 1 BIOSEN (BIOS Enable). BIOS boot ROM included in a flash connected to SPI3.                                          */

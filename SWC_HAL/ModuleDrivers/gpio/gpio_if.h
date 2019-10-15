@@ -131,13 +131,29 @@ typedef enum
 
 #endif
 
+/*---------------------------------------------------------------------------------------------------------*/
+/* Structure for holding GPIO status                                                                       */
+/*---------------------------------------------------------------------------------------------------------*/
+typedef struct GPIO_STAT {
+    UINT8        dataIn;
+    UINT8        dataOut;
+    GPIO_DIR_T   dir;
+    GPIO_PULL_T  pull;
+    GPIO_OTYPE_T OutputType;
+#if defined GPIO_CAPABILITY_VDD_DRIVEN
+    UINT8        VddDrv;        /* 1  - VDD Driven, 0 - Not VDD Driven */
+#endif
+#if defined GPIO_CAPABILITY_LOCK
+    UINT8        locked;        /* 1  - Locked, 0 - Not Locked */
+#endif
+} GPIO_STAT_T;
+
 
 /*---------------------------------------------------------------------------------------------------------*/
 /*---------------------------------------------------------------------------------------------------------*/
 /*                                           INTERFACE FUNCTIONS                                           */
 /*---------------------------------------------------------------------------------------------------------*/
 /*---------------------------------------------------------------------------------------------------------*/
-
 
 /*---------------------------------------------------------------------------------------------------------*/
 /* Function:        GPIO_Init                                                                              */
@@ -507,7 +523,61 @@ void GPIO_WritePortMask (UINT port, UINT value, UINT mask);
 /*                  pin. (The data in PxDIN register, which is read-only, is not affected.)                */
 /*---------------------------------------------------------------------------------------------------------*/
 void GPIO_Lock (UINT gpio);
+
+/*---------------------------------------------------------------------------------------------------------*/
+/* Function:        GPIO_isLocked                                                                          */
+/*                                                                                                         */
+/* Parameters:                                                                                             */
+/*                  gpio    - GPIO pin number.                                                             */
+/*                                                                                                         */
+/* Returns:         TRUE - if GPIO is locked                                                               */
+/*                  FALSE - if GPIO is not locked                                                          */
+/* Side effects:                                                                                           */
+/* Description:                                                                                            */
+/*                  This routine returns the GPIO locj status.                                             */
+/*---------------------------------------------------------------------------------------------------------*/
+BOOLEAN GPIO_isLocked (UINT gpio);
 #endif
+
+/*---------------------------------------------------------------------------------------------------------*/
+/* Function:        GPIO_GetPullType                                                                       */
+/*                                                                                                         */
+/* Parameters:                                                                                             */
+/*                  gpio    - GPIO pin number.                                                             */
+/*                                                                                                         */
+/* Returns:         GPIO_PULL_NONE, GPIO_PULL_UP, GPIO_PULL_DOWN                                           */
+/* Side effects:                                                                                           */
+/* Description:                                                                                            */
+/*                  This routine returns the GPIO PULL Status                                              */
+/*---------------------------------------------------------------------------------------------------------*/
+GPIO_PULL_T GPIO_GetPullType (UINT gpio);
+
+/*---------------------------------------------------------------------------------------------------------*/
+/* Function:        GPIO_GetOutputType                                                                     */
+/*                                                                                                         */
+/* Parameters:                                                                                             */
+/*                  gpio    - GPIO pin number.                                                             */
+/*                                                                                                         */
+/* Returns:         GPIO_OTYPE_PUSH_PULL, GPIO_OTYPE_OPEN_DRAIN                                            */
+/* Side effects:                                                                                           */
+/* Description:                                                                                            */
+/*                  This routine returns the GPIO Output Type (Push Pull or Open Drain)                    */
+/*---------------------------------------------------------------------------------------------------------*/
+GPIO_OTYPE_T GPIO_GetOutputType (UINT gpio);
+
+/*---------------------------------------------------------------------------------------------------------*/
+/* Function:        GPIO_GetStatus                                                                         */
+/*                                                                                                         */
+/* Parameters:                                                                                             */
+/*                  gpio    - GPIO pin number.                                                             */
+/*                  stat    - pointer to a GPIO_STAT_T structure                                           */
+/*                                                                                                         */
+/* Returns:         None                                                                                   */
+/* Side effects:                                                                                           */
+/* Description:                                                                                            */
+/*                  This routine update the "stat" structure with the current GPIO status.                 */
+/*---------------------------------------------------------------------------------------------------------*/
+void GPIO_GetStatus (UINT gpio, GPIO_STAT_T* stat);
 
 /*---------------------------------------------------------------------------------------------------------*/
 /* Function:        GPIO_PrintRegs                                                                         */

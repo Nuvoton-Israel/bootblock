@@ -46,20 +46,18 @@ void PCIMBX_ResetMailbox (void)
     ROM_STATUS_MSG *msgPtrROM = (ROM_STATUS_MSG *)ROM_STATUS_MSG_ADDR;
     ROM_STATUS_MSG *msgPtrBB =  (ROM_STATUS_MSG *)BOOTBLK_STATUS_MSG_ADDR;
 
+
+   // Reset the Mailbox
+    memset((void*)(BOOTBLK_STATUS_MSG_ADDR), 0x0, sizeof(ROM_STATUS_MSG));
+
     /* between image1 and image2 only one can be used by ROM according to FUSE_FUSTRAP.oAltImgLoc
        use the other image to mark if we already reset the BootBlock mailbox*/
     if (FUSE_Fustrap_Get(FUSE_FUSTRAP_oAltImgLoc))
     {
-        if (msgPtrROM->imageState.state.pk.pk_states.image1_pk2 == PK_IMAGE_SKIPPED)
-            return;
-
         msgPtrROM->imageState.state.pk.pk_states.image1_pk0 = PK_IMAGE_SKIPPED;
         msgPtrROM->imageState.state.pk.pk_states.image1_pk1 = PK_IMAGE_SKIPPED;
         msgPtrROM->imageState.state.pk.pk_states.image1_pk2 = PK_IMAGE_SKIPPED;
         msgPtrROM->imageState.state.image1State = IMAGE_NOT_IN_USE;
-
-		// Reset the Mailbox
-    	memset((void*)(MAILBOX_STATUS_ADDR), 0x0, sizeof(ROM_STATUS_MSG));
 
         msgPtrBB->imageState.state.pk.pk_states.image1_pk0 = PK_IMAGE_SKIPPED;
         msgPtrBB->imageState.state.pk.pk_states.image1_pk1 = PK_IMAGE_SKIPPED;
@@ -70,15 +68,10 @@ void PCIMBX_ResetMailbox (void)
     }
     else
     {
-        if (msgPtrROM->imageState.state.pk.pk_states.image2_pk2 == PK_IMAGE_SKIPPED)
-            return;
         msgPtrROM->imageState.state.pk.pk_states.image2_pk0 = PK_IMAGE_SKIPPED;
         msgPtrROM->imageState.state.pk.pk_states.image2_pk1 = PK_IMAGE_SKIPPED;
         msgPtrROM->imageState.state.pk.pk_states.image2_pk2 = PK_IMAGE_SKIPPED;
         msgPtrROM->imageState.state.image2state = IMAGE_NOT_IN_USE;
-
-		// Reset the Mailbox
-    	memset((void*)(MAILBOX_STATUS_ADDR), 0x0, sizeof(ROM_STATUS_MSG));
 
         msgPtrBB->imageState.state.pk.pk_states.image2_pk0 = PK_IMAGE_SKIPPED;
         msgPtrBB->imageState.state.pk.pk_states.image2_pk1 = PK_IMAGE_SKIPPED;
@@ -261,7 +254,7 @@ void    PCIMBX_GetStatus (ROM_STATUS_MSG *status, UINT8 image, BOOLEAN bROM)
 
     else if(image == 1)
     {
-    	status->imageState.state.image0State = msgPtr->imageState.state.image0State;
+    	status->imageState.state.image1State = msgPtr->imageState.state.image1State;
     	status->imageState.state.pk.pk_states.image1_pk0 = msgPtr->imageState.state.pk.pk_states.image1_pk0;
     	status->imageState.state.pk.pk_states.image1_pk1 = msgPtr->imageState.state.pk.pk_states.image1_pk1;
     	status->imageState.state.pk.pk_states.image1_pk2 = msgPtr->imageState.state.pk.pk_states.image1_pk2;
@@ -269,7 +262,7 @@ void    PCIMBX_GetStatus (ROM_STATUS_MSG *status, UINT8 image, BOOLEAN bROM)
 
     else if(image == 2)
     {
-    	status->imageState.state.image0State = msgPtr->imageState.state.image0State;
+    	status->imageState.state.image2state = msgPtr->imageState.state.image2state;
     	status->imageState.state.pk.pk_states.image2_pk0 = msgPtr->imageState.state.pk.pk_states.image2_pk0;
     	status->imageState.state.pk.pk_states.image2_pk1 = msgPtr->imageState.state.pk.pk_states.image2_pk1;
     	status->imageState.state.pk.pk_states.image2_pk2 = msgPtr->imageState.state.pk.pk_states.image2_pk2;
@@ -314,7 +307,7 @@ void    PCIMBX_SetStatus (ROM_STATUS_MSG *status, UINT8 image,  BOOLEAN bROM)
 
     else if(image == 1)
     {
-    	msgPtr->imageState.state.image0State = status->imageState.state.image0State;
+    	msgPtr->imageState.state.image1State = status->imageState.state.image1State;
     	msgPtr->imageState.state.pk.pk_states.image1_pk0 = status->imageState.state.pk.pk_states.image1_pk0;
     	msgPtr->imageState.state.pk.pk_states.image1_pk1 = status->imageState.state.pk.pk_states.image1_pk1;
     	msgPtr->imageState.state.pk.pk_states.image1_pk2 = status->imageState.state.pk.pk_states.image1_pk2;
@@ -322,7 +315,7 @@ void    PCIMBX_SetStatus (ROM_STATUS_MSG *status, UINT8 image,  BOOLEAN bROM)
 
     else if(image == 2)
     {
-    	msgPtr->imageState.state.image0State = status->imageState.state.image0State;
+    	msgPtr->imageState.state.image2state = status->imageState.state.image2state;
     	msgPtr->imageState.state.pk.pk_states.image2_pk0 = status->imageState.state.pk.pk_states.image2_pk0;
     	msgPtr->imageState.state.pk.pk_states.image2_pk1 = status->imageState.state.pk.pk_states.image2_pk1;
     	msgPtr->imageState.state.pk.pk_states.image2_pk2 = status->imageState.state.pk.pk_states.image2_pk2;

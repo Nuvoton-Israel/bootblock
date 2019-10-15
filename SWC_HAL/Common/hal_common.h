@@ -52,7 +52,7 @@
 #define DELAY_LOOP(count)                           \
 {                                                   \
     volatile UINT16 __i;                            \
-    for (__i=0; __i<count; ++__i) {}                \
+    for (__i=0; __i<(count); ++__i) {}              \
 }
 
 /*---------------------------------------------------------------------------------------------------------*/
@@ -73,7 +73,7 @@
 /*              CyclesPerIter      _1SEC_IN_USEC_                                                          */
 /*---------------------------------------------------------------------------------------------------------*/
 #define USEC_TO_ITERATIONS(microSecDelay, coreClk)                                              \
-    (UINT32)(((coreClk / _1SEC_IN_USEC_) * microSecDelay) / HFCG_NUM_OF_CYCLES_PER_ITERATION)
+    (UINT32)(((coreClk / _1SEC_IN_USEC_) * (microSecDelay)) / HFCG_NUM_OF_CYCLES_PER_ITERATION)
 
 /*---------------------------------------------------------------------------------------------------------*/
 /* Print function                                                                                          */

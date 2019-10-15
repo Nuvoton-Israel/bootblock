@@ -142,7 +142,7 @@ void SHM_Init (SHM_CALLBACK_T shm_callback)
 /* Returns:         none                                                                                   */
 /* Side effects:                                                                                           */
 /* Description:                                                                                            */
-/*                  This routine configs Shared memory host handling: interrupts, error response etc.      */
+/*                  This routine configures Shared memory host handling: interrupts, error response etc.   */
 /*lint -e{715}      Suppress 'bPrefetchEnable' not referenced                                              */
 /*---------------------------------------------------------------------------------------------------------*/
 void SHM_Config (   SHM_HOST_ERROR_RESPONSE_T  hostErrorResponse,
@@ -191,7 +191,7 @@ void SHM_Config (   SHM_HOST_ERROR_RESPONSE_T  hostErrorResponse,
 /* Function:        SHM_EspiRegisterCallback                                                               */
 /*                                                                                                         */
 /* Parameters:                                                                                             */
-/*                  shm_espiCallback - Espi callback                                                       */
+/*                  shm_espiCallback - ESPI callback                                                       */
 /*                                                                                                         */
 /* Returns:         none                                                                                   */
 /* Side effects:                                                                                           */
@@ -216,7 +216,7 @@ void SHM_EspiRegisterCallback (SHM_ESPI_CALLBACK_T shm_espiCallback)
 /*                                FALSE: Disable SMI on Core write to the semaphore register               */
 /*                  bEnableSemOnWindow -                                                                   */
 /*                                TRUE: enable a semaphore access through the first address byte of        */
-/*                                      the RAM Window. In othere words this will cuase the semaphore to   */
+/*                                      the RAM Window. In other words this will cause the semaphore to    */
 /*                                      be located in offset 0 of the SHM RAM window.                      */
 /* Returns:         none                                                                                   */
 /* Side effects:                                                                                           */
@@ -360,7 +360,6 @@ void SHM_HostSemaphoreConfig ( SHM_WINDOW_T window_num,
 }
 #endif
 
-
 /*---------------------------------------------------------------------------------------------------------*/
 /* Function:        SHM_WindowConfig                                                                       */
 /*                                                                                                         */
@@ -373,14 +372,14 @@ void SHM_HostSemaphoreConfig ( SHM_WINDOW_T window_num,
 /*                                if a bit is set to 1 - the specific aread is protected.                  */
 /*                                if a bit is set to 0 - the specific aread is not protected               */
 /*                                ===========================================================              */
-/*                                For uRider12 (and below)/SIO14/SIO15 the bits meaning are:               */
+/*                                For shm driver up to v6 the bits meaning are:                            */
 /*                                ===========================================================              */
 /*                                - Bit 0 = Low Half of window is Read Protected                           */
 /*                                - Bit 1 = Low Half of window is Write Protected                          */
 /*                                - Bit 2 = High Half of window is Read Protected                          */
 /*                                - Bit 3 = High Half of window is Write Protected                         */
 /*                                ===========================================================              */
-/*                                For MRider15 the bits meaning are:                                       */
+/*                                For shm driver v7 and above the bits meaning are:                        */
 /*                                ===========================================================              */
 /*                                - Bit 0  = Write Protect the first (lower) 1/8 of the RAM window         */
 /*                                - Bit 1  = Write Protect the second 1/8 of the RAM window                */
@@ -468,6 +467,92 @@ void SHM_WindowConfig ( SHM_WINDOW_T window_num,
 #endif
 }
 
+/*---------------------------------------------------------------------------------------------------------*/
+/* Function:        SHM_WindowProtect                                                                      */
+/*                                                                                                         */
+/* Parameters:                                                                                             */
+/*                  window_num  - Shared Memory Window to be configured.                                   */
+/*                  window_prot - bitMask of Shared RAM Window, Access Protection                          */
+/*                                if a bit is set to 1 - the specific aread is protected.                  */
+/*                                if a bit is set to 0 - the specific aread is not protected               */
+/*                                ===========================================================              */
+/*                                For shm driver up to v6 the bits meaning are:                            */
+/*                                ===========================================================              */
+/*                                - Bit 0 = Low Half of window is Read Protected                           */
+/*                                - Bit 1 = Low Half of window is Write Protected                          */
+/*                                - Bit 2 = High Half of window is Read Protected                          */
+/*                                - Bit 3 = High Half of window is Write Protected                         */
+/*                                ===========================================================              */
+/*                                For shm driver v7 and above the bits meaning are:                        */
+/*                                ===========================================================              */
+/*                                - Bit 0  = Write Protect the first (lower) 1/8 of the RAM window         */
+/*                                - Bit 1  = Write Protect the second 1/8 of the RAM window                */
+/*                                - Bit 2  = Write Protect the 3rd 1/8 of the RAM window                   */
+/*                                - Bit 3  = Write Protect the 4th 1/8 of the RAM window                   */
+/*                                - Bit 4  = Write Protect the 5th 1/8 of the RAM window                   */
+/*                                - Bit 5  = Write Protect the 6th 1/8 of the RAM window                   */
+/*                                - Bit 6  = Write Protect the 7th 1/8 of the RAM window                   */
+/*                                - Bit 7  = Write Protect the 8th 1/8 of the RAM window                   */
+/*                                - Bit 8  = Read Protect the first (lower) 1/8 of the RAM window          */
+/*                                - Bit 9  = Read Protect the second 1/8 of the RAM window                 */
+/*                                - Bit 10 = Read Protect the 3rd 1/8 of the RAM window                    */
+/*                                - Bit 11 = Read Protect the 4th 1/8 of the RAM window                    */
+/*                                - Bit 12 = Read Protect the 5th 1/8 of the RAM window                    */
+/*                                - Bit 13 = Read Protect the 6th 1/8 of the RAM window                    */
+/*                                - Bit 14 = Read Protect the 7th 1/8 of the RAM window                    */
+/*                                - Bit 15 = Read Protect the 8th 1/8 of the RAM window                    */
+/* Returns:         none                                                                                   */
+/* Side effects:                                                                                           */
+/* Description:                                                                                            */
+/*                  This routine sets Shared RAM Window Access Protection.                                 */
+/*---------------------------------------------------------------------------------------------------------*/
+void SHM_WindowProtect (
+    SHM_WINDOW_T    window_num,
+    UINT16          window_prot
+)
+{
+    ASSERT(window_num < SHM_NUM_OF_WINDOWS);
+
+#ifdef SHM_CAPABILITY_EXTENDED_8_AREA_PROTECTION
+    REG_WRITE(WIN_WR_PROT(window_num), (UINT8)window_prot);
+    REG_WRITE(WIN_RD_PROT(window_num), (UINT8)(window_prot >> 8));
+#endif
+
+#ifdef SHM_CAPABILITY_WIN_PROTECTION
+    /*-----------------------------------------------------------------------------------------------------*/
+    /* Set required Host Read/Write Protection for Window                                                  */
+    /*-----------------------------------------------------------------------------------------------------*/
+    SET_REG_FIELD(WIN_PROT, WIN_PROT_RWIN(window_num), (UINT8)window_prot);
+#endif
+}
+
+/*---------------------------------------------------------------------------------------------------------*/
+/* Function:        SHM_GetWindowProtect                                                                   */
+/*                                                                                                         */
+/* Parameters:                                                                                             */
+/*                  window_num  - Shared Memory Window.                                                    */
+/*                                                                                                         */
+/* Returns:                                                                                                */
+/*                  window_prot - bitMask of Shared RAM Window, Access Protection                          */
+/*                                if a bit is set to 1 - the specific aread is protected.                  */
+/*                                if a bit is set to 0 - the specific aread is not protected               */
+/* Side effects:                                                                                           */
+/* Description:                                                                                            */
+/*                  This routine retrieves Shared RAM Window Access Protection                             */
+/*---------------------------------------------------------------------------------------------------------*/
+UINT16 SHM_GetWindowProtect (SHM_WINDOW_T window_num)
+{
+    ASSERT(window_num < SHM_NUM_OF_WINDOWS);
+
+#ifdef SHM_CAPABILITY_EXTENDED_8_AREA_PROTECTION
+    return MAKE16(REG_READ(WIN_WR_PROT(window_num)), REG_READ(WIN_RD_PROT(window_num)));
+#endif
+
+#ifdef SHM_CAPABILITY_WIN_PROTECTION
+    return (UINT16)READ_REG_FIELD(WIN_PROT, WIN_PROT_RWIN(window_num));
+#endif
+}
+
 #ifdef SHM_CAPABILITY_EXTENDED_SHM
 /*---------------------------------------------------------------------------------------------------------*/
 /* Function:        SHM_EnableHostEventRegisters                                                           */
@@ -509,7 +594,6 @@ void SHM_EnableHostEventRegisters ( SHM_WINDOW_T window_num,
     }
 }
 #endif
-
 
 /*---------------------------------------------------------------------------------------------------------*/
 /* Function:        SHM_EnableSemaphoreInterrupt                                                           */
@@ -566,7 +650,6 @@ void SHM_EnableSemaphoreInterrupt (
     }
 }
 
-
 /*---------------------------------------------------------------------------------------------------------*/
 /* Function:        SHM_SemaphoreRead                                                                      */
 /*                                                                                                         */
@@ -587,7 +670,6 @@ UINT8 SHM_SemaphoreRead (SHM_WINDOW_T window_num)
     /*-----------------------------------------------------------------------------------------------------*/
     return REG_READ(SHAW_SEM(window_num));
 }
-
 
 /*---------------------------------------------------------------------------------------------------------*/
 /* Function:        SHM_SemaphoreWrite                                                                     */
@@ -613,7 +695,6 @@ void SHM_SemaphoreWrite (
     /*-----------------------------------------------------------------------------------------------------*/
     REG_WRITE(SHAW_SEM(window_num), value);
 }
-
 
 #if defined FIU_MODULE_TYPE && defined SHM_CAPABILITY_FLASH_ACCESS
 /*---------------------------------------------------------------------------------------------------------*/
@@ -651,14 +732,12 @@ void SHM_FlashConfig (
 }
 #endif
 
-
 /*---------------------------------------------------------------------------------------------------------*/
 /* Function:        SHM_HostAccessEnable                                                                   */
 /*                                                                                                         */
 /* Parameters:                                                                                             */
 /*                  enable - TRUE to stall host read transactions; FALSE otherwise.                        */
 /*                                                                                                         */
-/* Returns:         none                                                                                   */
 /* Returns:         none                                                                                   */
 /* Side effects:                                                                                           */
 /* Description:                                                                                            */
@@ -681,16 +760,15 @@ void SHM_HostAccessEnable (BOOLEAN enable)
 #endif
 }
 
-
 /*---------------------------------------------------------------------------------------------------------*/
 /* Function:        SHM_HostAccessState                                                                    */
 /*                                                                                                         */
 /* Parameters:      none                                                                                   */
-/* Returns:         TRUE if host read access is enabled; FALSE otherwise (host is stalled).                */
+/* Returns:         TRUE if host read transactions are stalled; FALSE otherwise.                           */
 /*                                                                                                         */
 /* Side effects:                                                                                           */
 /* Description:                                                                                            */
-/*                  This routine retrieves the host read transactions access state.                        */
+/*                  This routine retrieves the stall host read transactions state.                         */
 /*---------------------------------------------------------------------------------------------------------*/
 BOOLEAN SHM_HostAccessState (void)
 {
@@ -700,7 +778,6 @@ BOOLEAN SHM_HostAccessState (void)
     return (BOOLEAN)(! READ_REG_FIELD(SHM_CTL, SHM_CTL_STALL_HOST));
 #endif
 }
-
 
 /*---------------------------------------------------------------------------------------------------------*/
 /* Function:        SHM_ReleaseHostWait                                                                    */
@@ -715,7 +792,6 @@ void SHM_ReleaseHostWait (void)
 {
     SET_REG_FIELD(SMC_CTL, SMC_CTL_HOSTWAIT, TRUE);
 }
-
 
 /*---------------------------------------------------------------------------------------------------------*/
 /* Function:        SHM_IntHandler                                                                         */
@@ -800,13 +876,32 @@ void SHM_IntHandler (UINT16 int_num)
 #endif // ESPI_MODULE_TYPE
 }
 
-
 /*---------------------------------------------------------------------------------------------------------*/
 /* Function:        SHM_ClearInterrupts                                                                    */
 /*                                                                                                         */
 /* Parameters:                                                                                             */
-/*        window_num      - Shared Memory Window to be written.                                            */
-/*        val (bit mask)  - See SHM_INT_TYPE_T enumerator description                                      */
+/*                  window_num     - Shared Memory Window to be written.                                   */
+/*                  val (bit mask) -                                                                       */
+/*                           - 0x001 (SHM_INT_ON_HOST_RD_PROTECT_ADDR), clear pending interrupt on         */
+/*                                    host read from SHM protected address.                                */
+/*                           - 0x002 (SHM_INT_ON_HOST_WR_PROTECT_ADDR), clear pending interrupt on         */
+/*                                    host write to SHM protected address.                                 */
+/*                           - 0x008 (SHM_INT_ON_HOST_WR_TO_INDIRECT_SEM), clear pending interrupt on      */
+/*                                    host write to the indirect semaphore                                 */
+/*                           - 0x010 (SHM_INT_ON_HOST_WR_WIN1_SEM), clear pending interrupt on             */
+/*                                    host write to SHM win1 semaphore.                                    */
+/*                           - 0x020 (SHM_INT_ON_HOST_WR_WIN2_SEM), clear pending interrupt on             */
+/*                                    host write to SHM win2 semaphore.                                    */
+/*                           - 0x020 (SHM_INT_ON_ANY_HOST_SHM_WRITE), clear pending interrupt on           */
+/*                                    host write to any unprotected SHM address.                           */
+/*                           - 0x100 (SHM_INT_ON_HOST_RD_WIN1_CORE_OFFSET), clear pending interrupt on     */
+/*                                    host read from win1 core offset.                                     */
+/*                           - 0x200 (SHM_INT_ON_HOST_WR_WIN1_HOST_OFFSET), clear pending interrupt on     */
+/*                                    host write to win1 host offset.                                      */
+/*                           - 0x400 (SHM_INT_ON_HOST_RD_WIN2_CORE_OFFSET), clear pending interrupt on     */
+/*                                    host read from win2 core offset.                                     */
+/*                           - 0x800 (SHM_INT_ON_HOST_WR_WIN2_HOST_OFFSET), clear pending interrupt on     */
+/*                                    host write to win2 host offset.                                      */
 /*                                                                                                         */
 /* Returns:         none                                                                                   */
 /* Side effects:                                                                                           */
@@ -845,8 +940,8 @@ void SHM_ClearInterrupts (SHM_INT_TYPE_T val)
 #endif  /* SHM_CAPABILITY_EXTENDED_SHM */
 }
 
-
 #ifdef SHM_CAPABILITY_OFFSET
+
 /*---------------------------------------------------------------------------------------------------------*/
 /* Function:        SHM_SetCoreOffset                                                                      */
 /*                                                                                                         */
@@ -871,16 +966,15 @@ void SHM_SetCoreOffset (
     REG_WRITE(COFS(window_num), offset);
 }
 
-
 /*---------------------------------------------------------------------------------------------------------*/
 /* Function:        SHM_EnableCoreOffsetInterrupts                                                         */
 /*                                                                                                         */
 /* Parameters:                                                                                             */
 /*                  window_num - Shared Memory Window to be written.                                       */
-/*                  val       -  0 (SHM_OFFSET_INT__ON_HOST_RD_CORE_OFFSET), Enable/Disable interrupt on   */
-/*                                  host read from core offset.                                            */
-/*                            -  1 (SHM_OFFSET_INT__ON_HOST_WR_HOST_OFFSET), Enable/Disable interrupt on   */
-/*                                  host write to host offset.                                             */
+/*                  val        -  0 (SHM_OFFSET_INT__ON_HOST_RD_CORE_OFFSET), Enable/Disable interrupt on  */
+/*                                   host read from core offset.                                           */
+/*                             -  1 (SHM_OFFSET_INT__ON_HOST_WR_HOST_OFFSET), Enable/Disable interrupt on  */
+/*                                   host write to host offset.                                            */
 /*                                                                                                         */
 /* Returns:         none                                                                                   */
 /* Side effects:                                                                                           */
@@ -941,7 +1035,6 @@ void SHM_EnableCoreOffsetInterrupts (
     }
 }
 
-
 /*---------------------------------------------------------------------------------------------------------*/
 /* Function:        SHM_SetHostOffset                                                                      */
 /*                                                                                                         */
@@ -1000,20 +1093,19 @@ void SHM_SetHostOffset (
     }
 }
 
-
 /*---------------------------------------------------------------------------------------------------------*/
 /* Function:        SHM_EnableHostOffsetInterrupts                                                         */
 /*                                                                                                         */
 /* Parameters:                                                                                             */
 /*                  window_num - Shared Memory Window to be written.                                       */
-/*                  mask      -  bit 0 (E_IRQ_CORE_RD_FROM_HOST_OFFSET), when set, Enable IRQ on           */
+/*                  mask       -  bit 0 (E_IRQ_CORE_RD_FROM_HOST_OFFSET), when set, Enable IRQ on          */
 /*                                      core read from host offset.                                        */
-/*                            -  bit 1 (E_IRQ_CORE_WR_TO_CORE_OFFSET), when set, Enable IRQ on             */
+/*                             -  bit 1 (E_IRQ_CORE_WR_TO_CORE_OFFSET), when set, Enable IRQ on            */
 /*                                      core write to core offset.                                         */
-/*                            -  bit 2,3 not used                                                          */
-/*                            -  bit 4 (E_SMI_CORE_RD_FROM_HOST_OFFSET), when set, Enable SIM on           */
+/*                             -  bit 2,3 not used                                                         */
+/*                             -  bit 4 (E_SMI_CORE_RD_FROM_HOST_OFFSET), when set, Enable SIM on          */
 /*                                      core read from host offset.                                        */
-/*                            -  bit 5 (E_SMI_CORE_WR_TO_CORE_OFFSET), when set, Enable SMI on             */
+/*                             -  bit 5 (E_SMI_CORE_WR_TO_CORE_OFFSET), when set, Enable SMI on            */
 /*                                      core write to core offset.                                         */
 /*                                                                                                         */
 /* Returns:         none                                                                                   */
