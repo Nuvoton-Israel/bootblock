@@ -82,7 +82,7 @@ static DEFS_STATUS          vref_training_l       (void);
 static DEFS_STATUS          Sweep_DQs_ECC_Trim_l      (BOOLEAN bInput);
 static DEFS_STATUS          Sweep_DQs_Trim_l      (BOOLEAN bInput);
 static DEFS_STATUS          Sweep_Trim_Input_DQS_l    (int *pEyeCenter, int *pEyeSize, BOOLEAN bECC, BOOLEAN bSilent);
-static DEFS_STATUS          Sweep_Input_DSQ_Enhanced_Training_l(BOOLEAN bECC);
+static DEFS_STATUS 			Sweep_Input_DSQ_Enhanced_Training_l(void);
 static void                 FindMidBiggestEyeBitwise_l(const UINT16 *SweepDataBuff, const int BuffSize,  int *pEyeCenter, int *pEyeSize, int bits);
 static INT32                MC_CalcBestTrim_l         (INT32 dlls_trim_l);
 static void                         phy_update_dlls_trim_adrctl_clk_l(void);
@@ -93,6 +93,7 @@ static DEFS_STATUS          WriteModeReg              (UINT8 Index, UINT32 Data)
 static DEFS_STATUS          MPR_Readout_RawData       (UINT8 Page, /*OUT*/ UINT16 *MPR_RawData);
 static DEFS_STATUS          MPR_Page_Readout          (UINT8 Page, /*OUT*/ UINT8 *MPR);
 static void                 SDRAM_PrintRegs           (void);
+void 				MC_PrintRegs 			  (void);
 static UINT16                       GetECCSyndrom             (UINT32 readVal);
 
 
@@ -529,7 +530,7 @@ static void phy_update_dlls_trim_adrctl_clk_l(void)
 	REG_WRITE(PHY_DLL_TRIM_CLK, 0x00000040 | (0x3F & dlls_trim_adrctl_clk));
 	REG_WRITE(PHY_DLL_RECALIB, BUILD_FIELD_VAL(PHY_DLL_RECALIB_ctr_start_val,      0xA) |
 	BUILD_FIELD_VAL(PHY_DLL_RECALIB_incr_dly_adrctrl_ma, 1)|
-	BUILD_FIELD_VAL(PHY_DLL_RECALIB_recalib_cnt,        0X640)|  // 22/AUG/2016: changed from 0x10 to 0x640; DLLs recalibration period every 512us
+	BUILD_FIELD_VAL(PHY_DLL_RECALIB_recalib_cnt, 0x640)|  // 22/AUG/2016: changed from 0x10 to 0x640; DLLs recalibration period every 512us
 	(0x3F & dlls_trim_adrctl_clk)); // PHY_DLL_RECALIB
 
 	serial_printf("\t> Update dlls_trim_adrctl_clk to %d \n", (0x3F & dlls_trim_adrctl_clk));
@@ -1049,6 +1050,10 @@ static DEFS_STATUS phy_read_leveling_l (BOOLEAN bPrint)
 
 	DEFS_STATUS status = DEFS_STATUS_OK;
 
+
+	// quick memory test. Don't check the return value.
+	memcmp((void*)0x8000, (void*)(0x8000 + 1024 * 1024), 1024 * 32); //  dummy access to memory in order for values to update
+
 	// print info ...
 	if(bPrint == TRUE)
 	{
@@ -1117,6 +1122,8 @@ static DEFS_STATUS phy_read_leveling_l (BOOLEAN bPrint)
 		serial_printf("\t*main_clk_dly: %lu\n", TmpReg32);
 	}
 
+	// quick memory test. Don't check the return value.
+	memcmp((void*)0x8000, (void*)(0x8000 + 1024 * 1024), 1024 * 32); //  dummy access to memory in order for values to update
 
 	return status;
 }
@@ -1302,7 +1309,7 @@ static DEFS_STATUS vref_training_l (void)
 	/*-----------------------------------------------------------------------------------------------------*/
 	/* clear vref_training and update_ddr_vref bits.                               */
 	/*-----------------------------------------------------------------------------------------------------*/
-	REG_WRITE(PHY_LANE_SEL, 0*7);
+	REG_WRITE(PHY_LANE_SEL, 0);
 	val = (ddr_vref<<12) | (ddr_vref_range<<11) | (phy_vref[0]<<4);
 	REG_WRITE(VREF_TRAINING, val | 0x04); // vref_output_enable
 
@@ -1363,6 +1370,11 @@ static DEFS_STATUS phy_leveling_l(UINT16 mode)
 {
 	DEFS_STATUS status = DEFS_STATUS_OK ;
 
+	REG_WRITE(PHY_LANE_SEL, 0);
+
+	// dummy accsess to DDR
+	IOW32 (0x1000, IOR32(0x1000));
+
 	if((mode & PHY_WR_LVL) !=0)
 	{
 		if ((status = phy_write_leveling_l()) != DEFS_STATUS_OK)
@@ -1419,45 +1431,89 @@ static DEFS_STATUS phy_leveling_l(UINT16 mode)
 
 	// Step 10 - Turn off x-prop fix in simulation
 	REG_WRITE(DISABLE_GATING_FOR_SCL, BUILD_FIELD_VAL(DISABLE_GATING_FOR_SCL_disable_scl_gating, 1)  |
-	BUILD_FIELD_VAL(DISABLE_GATING_FOR_SCL_disable_x_prop_fix, 1));  // register h6E    - only in simulation
+	BUILD_FIELD_VAL(DISABLE_GATING_FOR_SCL_disable_x_prop_fix, 1));  // register h6E	- only in simulation
 
 
 
-	REG_WRITE(PHY_LANE_SEL,0); // 10/03/2016: add to reset lane select
+	REG_WRITE(PHY_LANE_SEL, 0);
+
+	// dummy accsess to DDR
+	IOW32 (0x1000, IOR32(0x1000));
 
 	return status;
 }
 
 
 /*---------------------------------------------------------------------------------------------------------*/
-/* Function:        Sweep_Trim_Input_DQS_l                                 */
-/*                                                     */
-/* Parameters:      BOOLEAN bECC    : sweep ECC lane                           */
-/* Parameters:      BOOLEAN bSilent : print results                            */
-/* Returns:     pEyeCenter,     pEyeSize                               */
-/* Side effects:                                               */
-/* Description:                                                */
-/*          This routine sweeps DQS delay and set to an optimized value in the middle of eye center */
+/* Function:		Set_DQS_in_val								           */
+/*													   */
+/* Parameters:		ilane - lane to set                    					           */
+/* Parameters:		input_val - to set to DQS input					                   */
+/* Returns:							                                           */
+/* Side effects:											   */
+/* Description:												   */
+/*			This routine sets in         DQS                                                   */
+/*---------------------------------------------------------------------------------------------------------*/
+static void Set_DQS_in_val (int ilane, UINT32 input_val, BOOLEAN bPrint)
+{
+	if(bPrint == TRUE)
+		serial_printf("lane%d set in DQS to 0x%x\n", ilane, input_val);
+	REG_WRITE(PHY_LANE_SEL, (ilane*7) + 0x800);
+	REG_WRITE(IP_DQ_DQS_BITWISE_TRIM, 0x80 |  (0x7F & input_val));
+
+	REG_WRITE(PHY_LANE_SEL, 0);
+	IOW32 (0x1000, IOR32(0x1000));
+}
+
+/*---------------------------------------------------------------------------------------------------------*/
+/* Function:		Set_DQS_out_val								           */
+/*													   */
+/* Parameters:		ilane - lane to set                    					           */
+/* Parameters:		output_val - to set to DQS ouput				                   */
+/* Returns:							                                           */
+/* Side effects:											   */
+/* Description:												   */
+/*			This routine sets out        DQS                                                   */
+/*---------------------------------------------------------------------------------------------------------*/
+static void Set_DQS_out_val (int ilane, UINT32 output_val, BOOLEAN bPrint)
+{
+
+	if(bPrint == TRUE)
+		serial_printf("lane%d set out DQS to 0x%x\n", ilane, output_val);
+	REG_WRITE(PHY_LANE_SEL, (ilane*7) + 0x900);
+	REG_WRITE(OP_DQ_DM_DQS_BITWISE_TRIM, 0x80 |  (0x7F & output_val));
+
+
+	REG_WRITE(PHY_LANE_SEL, 0);
+	IOW32 (0x1000, IOR32(0x1000));
+}
+
+
+/*---------------------------------------------------------------------------------------------------------*/
+/* Function:		Sweep_Trim_Input_DQS_l								   */
+/*													   */
+/* Parameters:		BOOLEAN bECC	: sweep ECC lane						   */
+/* Parameters:		BOOLEAN bSilent : print results							   */
+/* Returns:		pEyeCenter, 	pEyeSize							   */
+/* Side effects:											   */
+/* Description:												   */
+/*			This routine sweeps DQS delay and set to an optimized value in the middle of eye center */
 /*---------------------------------------------------------------------------------------------------------*/
 static DEFS_STATUS Sweep_Trim_Input_DQS_l (int *pEyeCenter, int *pEyeSize, BOOLEAN bECC, BOOLEAN bSilent )
 {
-	UINT32       ilane;
-	UINT32       NewTrimReg;
-	UINT16       TmpReg16;
-	UINT16       l_LaneStatus [0x40]; // 16bit for 16 bit of data. each bit is 0 for pass or 1 for fail.
-	UINT32       l_PresetTrim[NUM_OF_LANES_MAX];
-	int      laneStart = 0;
-	int      laneStop = 2;
-	DEFS_STATUS  status = DEFS_STATUS_OK;
+	UINT32		 ilane;
+	UINT32		 NewTrimReg;
+	UINT16		 TmpReg16;
+	UINT16		 l_LaneStatus [0x40]; // 16bit for 16 bit of data. each bit is 0 for pass or 1 for fail.
+	UINT32		 l_PresetTrim_in[NUM_OF_LANES_MAX] = {0, 0, 0};
+	int		 laneStart = 0;
+	int		 laneStop = 2;
+	DEFS_STATUS	 status = DEFS_STATUS_OK;
+	UINT16		 mem_test_results = 0;
+	int		 mem_test_cnt = 0;
 
 	int eye_center[16];
 	int eye_size[16];
-
-#define DISPLAY_DQS_SWEEP 0
-#if DISPLAY_DQS_SWEEP
-	int          Separation;
-#endif
-
 
 	if (bECC == TRUE)
 	{
@@ -1478,22 +1534,25 @@ static DEFS_STATUS Sweep_Trim_Input_DQS_l (int *pEyeCenter, int *pEyeSize, BOOLE
 
 
 	/*---------------------------------------------------------------------------------------------------------*/
-	/*  Get default values (of all lanes)                                      */
+	/*	Get default values (of all lanes)									   */
 	/*---------------------------------------------------------------------------------------------------------*/
 	for (ilane = laneStart ; ilane < laneStop; ilane++)
 	{
-		REG_WRITE(PHY_LANE_SEL,(ilane*7)+(8<<8));
+		REG_WRITE(PHY_LANE_SEL, (ilane*7) + 0x800);
+		l_PresetTrim_in[ilane] = READ_REG_FIELD(IP_DQ_DQS_BITWISE_TRIM, IP_DQ_DQS_BITWISE_TRIM_ip_dq_dqs_bitwise_trim_reg);
 
-		// keep register value
-		l_PresetTrim[ilane] = READ_REG_FIELD(IP_DQ_DQS_BITWISE_TRIM, IP_DQ_DQS_BITWISE_TRIM_ip_dq_dqs_bitwise_trim_reg);
+		REG_WRITE(PHY_LANE_SEL, 0);
+		IOW32 (0x1000, IOR32(0x1000));
 	}
 
 
+	// dummy accsess to DDR
+	REG_WRITE(PHY_LANE_SEL, 0);
+	IOW32 (0x1000,IOR32(0x1000));
 
-
-	/*---------------------------------------------------------------------------------------------------------*/
-	/*  Sweep                                                      */
-	/*---------------------------------------------------------------------------------------------------------*/
+	/*----------------------------------------------------------------------*/
+	/*	Sweep                                                           */
+	/*----------------------------------------------------------------------*/
 	for (NewTrimReg = 0x00 ; NewTrimReg < 0x40; NewTrimReg++)
 	{
 		REG_WRITE(PHY_LANE_SEL, 0);
@@ -1501,44 +1560,27 @@ static DEFS_STATUS Sweep_Trim_Input_DQS_l (int *pEyeCenter, int *pEyeSize, BOOLE
 		// Update trim value into DQS
 		for (ilane = laneStart; ilane < laneStop ; ilane++)
 		{
-			REG_WRITE(PHY_LANE_SEL,(ilane*7)+(8<<8));
-			REG_WRITE(IP_DQ_DQS_BITWISE_TRIM, 0x80 |  (0x7F & NewTrimReg));
+			Set_DQS_in_val(ilane, NewTrimReg, FALSE);
 		}
 
-		REG_WRITE(PHY_LANE_SEL, 0);
 
-		// dummy accsess to DDR
-		IOW32 (0x1000,IOR32(0x1000));
+		// memory stress test (repeat up to 10 times).
+		mem_test_cnt = 10;
+		mem_test_results = 0x0000;
+		do {
+			mem_test_results |=  MC_MemStressTest(bECC, FALSE);
+			if (bECC)
+				mem_test_results &= 0x7F;
+			mem_test_cnt--;
+		} while ((mem_test_results == 0x0) && (mem_test_cnt > 0));
 
-		// memory stress test
-		l_LaneStatus[NewTrimReg] =  MC_MemStressTest(bECC, bSilent); //  for enhanced sweep silent is TRUE, and also can reduce the mem test
-		// for final sweep silent is false.
+		l_LaneStatus[NewTrimReg] = mem_test_results;
 	}
 
 
-
-	/*---------------------------------------------------------------------------------------------------------*/
-	/*  Display                                                                                             */
-	/*---------------------------------------------------------------------------------------------------------*/
-#if DISPLAY_DQS_SWEEP
-	if (bECC == TRUE)
-	{
-		serial_printf("\t\t\t\tlane1        lane0\n");
-		serial_printf("\t\t\t\t7... ...0    7... ...0\n");
-		for (NewTrimReg = 0x00; NewTrimReg < 0x40; NewTrimReg++)
-		{
-			if (( l_LaneStatus[NewTrimReg] != 0xFFFF) && ( l_LaneStatus[NewTrimReg] != 0xFF80))
-			{
-				serial_printf("\treg= 0x%02X  bitwise ber= %d%d%d%d %d%d%d%d    %d%d%d%d %d%d%d%d\n",
-					NewTrimReg, BINARY_PRINT16(l_LaneStatus[NewTrimReg]));
-			}
-		}
-	}
-#endif // DISPLAY_DQS_SWEEP
-
-
-
-	// align bit results to lane results
+	/*----------------------------------------------------------------------*/
+	/* align bit results to lane results (one bit fail all DQS fails)       */
+	/*----------------------------------------------------------------------*/
 	if (bECC == FALSE)
 	{
 		for (NewTrimReg = 0x00; NewTrimReg < 0x40; NewTrimReg++)
@@ -1567,7 +1609,39 @@ static DEFS_STATUS Sweep_Trim_Input_DQS_l (int *pEyeCenter, int *pEyeSize, BOOLE
 
 
 
+	/*---------------------------------------------------------------------------------------------------------*/
+	/*	Display 																							*/
+	/*---------------------------------------------------------------------------------------------------------*/
+	if (bSilent == FALSE)
+	{
+		if (bECC == FALSE)
+		{
+			serial_printf("\t\t\t\tlane1		lane0\n");
+			serial_printf("\t\t\t\t7... ...0	7... ...0\n");
+			for (NewTrimReg = 0x00; NewTrimReg < 0x40; NewTrimReg++)
+			{
+				// if (l_LaneStatus[NewTrimReg] != 0xFFFF)
+				{
+					serial_printf("\treg= 0x%02X  bitwise ber= %d%d%d%d %d%d%d%d	%d%d%d%d %d%d%d%d\n",
+						NewTrimReg, BINARY_PRINT16(l_LaneStatus[NewTrimReg]));
+				}
+			}
+		}
+		else
+		{
+			serial_printf("\t\t\t\tlane2\n");
+			serial_printf("\t\t\t\t6.....0\n");
+			for (NewTrimReg = 0x00; NewTrimReg < 0x40; NewTrimReg++)
+			{
+				// if (l_LaneStatus[NewTrimReg] != 0xFFFF)
+				{
+					serial_printf("\treg= 0x%02X  bitwise ber= %d%d%d%d%d%d%d\n",
+						NewTrimReg, BINARY_PRINT7(l_LaneStatus[NewTrimReg]));
+				}
+			}
 
+		}
+	}
 
 
 	FindMidBiggestEyeBitwise_l(l_LaneStatus, ARRAY_SIZE(l_LaneStatus),
@@ -1590,7 +1664,7 @@ static DEFS_STATUS Sweep_Trim_Input_DQS_l (int *pEyeCenter, int *pEyeSize, BOOLE
 	}
 
 	/*---------------------------------------------------------------------------------------------------------*/
-	/* Check results and print info                                        */
+	/* Check results and print info										   */
 	/*---------------------------------------------------------------------------------------------------------*/
 	if (bSilent == FALSE)
 		serial_printf("\n");
@@ -1598,21 +1672,21 @@ static DEFS_STATUS Sweep_Trim_Input_DQS_l (int *pEyeCenter, int *pEyeSize, BOOLE
 	{
 
 		/*---------------------------------------------------------------------------------------------*/
-		/* Check if there is a valid eye (more then 5).  If not: use the original value:           */
+		/* Check if there is a valid eye (more then 5).	 If not: use the original value:		   */
 		/*---------------------------------------------------------------------------------------------*/
 		if  (pEyeSize[ilane] < 5)
 		{
 			serial_printf(KRED "\tlane=%d; Input DQS: no eye center or eye too small (size=%d), use the original value %d\n",
-				ilane, pEyeSize[ilane], l_PresetTrim[ilane] );
+				ilane, pEyeSize[ilane], l_PresetTrim_in[ilane] );
 
-			pEyeCenter[ilane] = l_PresetTrim[ilane];
+			pEyeCenter[ilane] = l_PresetTrim_in[ilane];
 
 			serial_printf("\tlane= %d; eyesize= %d; eye center= 0x%x (was val= 0x%x; diff= %d)\n",
 				ilane,
 				pEyeSize[ilane],
 				pEyeCenter[ilane],
-				l_PresetTrim[ilane],
-				(pEyeCenter[ilane] - l_PresetTrim[ilane]));
+				l_PresetTrim_in[ilane],
+				(pEyeCenter[ilane] - l_PresetTrim_in[ilane]));
 		}
 		else
 		{
@@ -1621,62 +1695,50 @@ static DEFS_STATUS Sweep_Trim_Input_DQS_l (int *pEyeCenter, int *pEyeSize, BOOLE
 					ilane,
 					pEyeSize[ilane],
 					pEyeCenter[ilane],
-					l_PresetTrim[ilane],
-					(pEyeCenter[ilane] - l_PresetTrim[ilane]));
+					l_PresetTrim_in[ilane],
+					(pEyeCenter[ilane] - l_PresetTrim_in[ilane]));
 		}
 
 	}
 
 
 	/*---------------------------------------------------------------------------------------------------------*/
-	/*  Set new values                                                 */
+	/*	Set center values	(input only)                                                               */
 	/*---------------------------------------------------------------------------------------------------------*/
 	for (ilane = laneStart; ilane < laneStop ; ilane++)
 	{
-		serial_printf_debug("\tSweep DQS results: Lane%d, set %d to DQS (eye size is %d)\n", ilane,  pEyeCenter[ilane], pEyeSize[ilane]);
-		REG_WRITE(PHY_LANE_SEL,(ilane*7)+(8<<8));
-		REG_WRITE(IP_DQ_DQS_BITWISE_TRIM,(0x80 | pEyeCenter[ilane]) );
+		Set_DQS_in_val(ilane, pEyeCenter[ilane], !bSilent);
 	}
-
-	// dummy accsess to DDR (07/AUG/2016)
-	IOW32 (0x1000, IOR32(0x1000));
-
-	REG_WRITE(PHY_LANE_SEL, 0);
-
-	/*-----------------------------------------------------------------------------------------*/
-	/* Read leveling  (quick with no prints)                           */
-	/*-----------------------------------------------------------------------------------------*/
-	status = phy_leveling_l(PHY_RD_LVL_FAST);
 
 	return status;
 }
 
 
 /*---------------------------------------------------------------------------------------------------------*/
-/* Function:        Sweep_DQs_ECC_Trim_l                                   */
-/*                                                     */
-/* Parameters:      none                                           */
-/* Returns:                                                */
-/* Side effects:                                               */
-/* Description:                                                */
-/*          This routine sweep DQs delay and set to an optimized value in the middle of eye center */
+/* Function:		Sweep_DQs_ECC_Trim_l								   */
+/*													   */
+/* Parameters:		none										   */
+/* Returns:												   */
+/* Side effects:											   */
+/* Description:												   */
+/*			This routine sweep DQs delay and set to an optimized value in the middle of eye center */
 /*---------------------------------------------------------------------------------------------------------*/
 static DEFS_STATUS Sweep_DQs_ECC_Trim_l (BOOLEAN bInput)
 {
 	const static int startScan = -62;
 	const static int stopScan  = 62 ;
 
-	const UINT32     MC_DQ_DQS_BITWISE_TRIM_SAMPLING_POINTS = (stopScan - startScan + 1);
-	const int    NUM_OF_LANES_SWEEP = 3;
-	int      samplePoint = 0;
-	UINT32       ilane ,ibit;
-	UINT32       NewTrimReg;
-	UINT16       l_DQs_ECC_BitStatus[MC_DQ_DQS_BITWISE_TRIM_SAMPLING_POINTS]; // 16bit for 16 bit of data. each bit is 0 for pass or 1 for fail.
-	UINT32       l_DQs_ECC_PresetTrim[NUM_OF_LANES_SWEEP][7];
-	int      l_DQs_ECC_BestTrim_EyeCenter[7], l_DQs_ECC_BestTrim_EyeSize[7];
-	int      sum = 0;
+	const UINT32	 MC_DQ_DQS_BITWISE_TRIM_SAMPLING_POINTS = (stopScan - startScan + 1);
+	const int	 NUM_OF_LANES_SWEEP = 3;
+	int		 samplePoint = 0;
+	UINT32		 ilane ,ibit;
+	UINT32		 NewTrimReg;
+	UINT16		 l_DQs_ECC_BitStatus[MC_DQ_DQS_BITWISE_TRIM_SAMPLING_POINTS]; // 16bit for 16 bit of data. each bit is 0 for pass or 1 for fail.
+	UINT32		 l_DQs_ECC_PresetTrim[NUM_OF_LANES_SWEEP][7];
+	int		 l_DQs_ECC_BestTrim_EyeCenter[7], l_DQs_ECC_BestTrim_EyeSize[7];
+	int		 sum = 0;
 	UINT32           ibit2 = 0;
-	DEFS_STATUS  status = DEFS_STATUS_OK;
+	DEFS_STATUS	 status = DEFS_STATUS_OK;
 
 
 
@@ -1939,38 +2001,38 @@ static DEFS_STATUS Sweep_DQs_ECC_Trim_l (BOOLEAN bInput)
 	// return to ROM code vector table:
 	SET_REG_FIELD(FLOCKR1, FLOCKR1_RAMV, 0);
 
-	return DEFS_STATUS_OK;
+	return status; // status;
 }
 
 //   ECC SWEEP END
 
 
 /*---------------------------------------------------------------------------------------------------------*/
-/* Function:        Sweep_DQs_Trim_l                                           */
-/*                                                     */
-/* Parameters:      none                                           */
-/* Returns:                                                */
-/* Side effects:                                               */
-/* Description:                                                */
-/*          This routine sweep DQs delay and set to an optimized value in the middle of eye center */
+/* Function:		Sweep_DQs_Trim_l										   */
+/*													   */
+/* Parameters:		none										   */
+/* Returns:												   */
+/* Side effects:											   */
+/* Description:												   */
+/*			This routine sweep DQs delay and set to an optimized value in the middle of eye center */
 /*---------------------------------------------------------------------------------------------------------*/
 static DEFS_STATUS Sweep_DQs_Trim_l (BOOLEAN bInput)
 {
 	const static int startScan = -62;
 	const static int stopScan  = 62 ;
 
-	const UINT32     MC_DQ_DQS_BITWISE_TRIM_SAMPLING_POINTS = (stopScan - startScan + 1);
-	const int        NUM_OF_LANES_SWEEP = 2; // we do not support lane-2 (ECC) sweep.
-	int          samplePoint = 0;
-	UINT32       ilane ,ibit;
-	UINT32       NewTrimReg;
-	UINT16       g_Table_Y_BitStatus [MC_DQ_DQS_BITWISE_TRIM_SAMPLING_POINTS]; // 16bit for 16 bit of data. each bit is 0 for pass or 1 for fail.
-	UINT32       g_PresetTrim[NUM_OF_LANES_SWEEP][8];
-	int          g_Table_Y_BestTrim_EyeCenter[16], g_Table_Y_BestTrim_EyeSize[16];
-	int          sum = 0;
-	int      Separation;
+	const UINT32	 MC_DQ_DQS_BITWISE_TRIM_SAMPLING_POINTS = (stopScan - startScan + 1);
+	const int	 NUM_OF_LANES_SWEEP = 2; // we do not support lane-2 (ECC) sweep.
+	int		 samplePoint = 0;
+	UINT32		 ilane ,ibit;
+	UINT32		 NewTrimReg;
+	UINT16		 g_Table_Y_BitStatus [MC_DQ_DQS_BITWISE_TRIM_SAMPLING_POINTS]; // 16bit for 16 bit of data. each bit is 0 for pass or 1 for fail.
+	UINT32		 g_PresetTrim[NUM_OF_LANES_SWEEP][8];
+	int		 g_Table_Y_BestTrim_EyeCenter[16], g_Table_Y_BestTrim_EyeSize[16];
+	int		 sum = 0;
+	int		 Separation;
 
-	DEFS_STATUS      status = DEFS_STATUS_OK;
+	DEFS_STATUS		 status = DEFS_STATUS_OK;
 
 	if ( bInput == TRUE)
 	serial_printf("\n>Sweep Input DQn:\n");
@@ -1981,20 +2043,20 @@ static DEFS_STATUS Sweep_DQs_Trim_l (BOOLEAN bInput)
 
 
 	/*---------------------------------------------------------------------------------------------------------*/
-	/*  Get default values (of all lanes)                                      */
+	/*	Get default values (of all lanes)									   */
 	/*---------------------------------------------------------------------------------------------------------*/
-	for (ilane = 0 ; ilane < NUM_OF_LANES_SWEEP  ; ilane++)
+	for (ilane = 0 ; ilane < NUM_OF_LANES_SWEEP	 ; ilane++)
 	{
 		//serial_printf("lane%d:", ilane);
-		for (ibit=0; ibit<8; ibit++)
+		for (ibit = 0; ibit < 8; ibit++)
 		{
 			REG_WRITE(PHY_LANE_SEL,(ilane*7)+(ibit<<8));
 
 			// keep register value
 			if ( bInput == TRUE)
-			g_PresetTrim[ilane][ibit] = READ_REG_FIELD(IP_DQ_DQS_BITWISE_TRIM, IP_DQ_DQS_BITWISE_TRIM_ip_dq_dqs_bitwise_trim_reg);
+				g_PresetTrim[ilane][ibit] = READ_REG_FIELD(IP_DQ_DQS_BITWISE_TRIM, IP_DQ_DQS_BITWISE_TRIM_ip_dq_dqs_bitwise_trim_reg);
 			else
-			g_PresetTrim[ilane][ibit] = READ_REG_FIELD(OP_DQ_DM_DQS_BITWISE_TRIM, OP_DQ_DM_DQS_BITWISE_TRIM_op_dq_dm_dqs_bitwise_trim_reg);
+				g_PresetTrim[ilane][ibit] = READ_REG_FIELD(OP_DQ_DM_DQS_BITWISE_TRIM, OP_DQ_DM_DQS_BITWISE_TRIM_op_dq_dm_dqs_bitwise_trim_reg);
 
 			// serial_printf(" %#010lx", g_PresetTrim[ilane][ibit] );
 		}
@@ -2002,7 +2064,7 @@ static DEFS_STATUS Sweep_DQs_Trim_l (BOOLEAN bInput)
 	}
 
 	/*---------------------------------------------------------------------------------------------------------*/
-	/*  Sweep                                                      */
+	/*	Sweep													   */
 	/*---------------------------------------------------------------------------------------------------------*/
 	for (samplePoint = startScan ; samplePoint <= stopScan; samplePoint++)
 	{
@@ -2016,9 +2078,9 @@ static DEFS_STATUS Sweep_DQs_Trim_l (BOOLEAN bInput)
 				REG_WRITE(PHY_LANE_SEL,(ilane*7)+(ibit<<8));
 
 				if ( bInput == TRUE)
-				REG_WRITE(IP_DQ_DQS_BITWISE_TRIM, 0x80 |  (0x7F & NewTrimReg));
+					REG_WRITE(IP_DQ_DQS_BITWISE_TRIM, 0x80 |  (0x7F & NewTrimReg));
 				else
-				REG_WRITE(OP_DQ_DM_DQS_BITWISE_TRIM, 0x80 |  (0x7F & NewTrimReg));
+					REG_WRITE(OP_DQ_DM_DQS_BITWISE_TRIM, 0x80 |  (0x7F & NewTrimReg));
 			}
 			// Set DM too.
 			if ( bInput == FALSE)
@@ -2028,25 +2090,26 @@ static DEFS_STATUS Sweep_DQs_Trim_l (BOOLEAN bInput)
 			}
 		}
 
-		// dummy accsess to DDR (07/AUG/2016)
-		IOW32 (0x1000,IOR32(0x1000));
+		// dummy accsess to DDR
+		IOW32 (0x1000, IOR32(0x1000));
+		REG_WRITE(PHY_LANE_SEL, 0);
 
 		g_Table_Y_BitStatus[(samplePoint - startScan)%MC_DQ_DQS_BITWISE_TRIM_SAMPLING_POINTS] = MC_MemStressTest(FALSE, FALSE);
 	}
 
 	//-------------------------------------
-	serial_printf("\t\t\t\t\tlane1    lane0\n");
-	serial_printf("\t\t\t\t\t7... ...0    7... ...0\n");
+	serial_printf("\t\t\t\t\tlane1	  lane0\n");
+	serial_printf("\t\t\t\t\t7... ...0	  7... ...0\n");
 	Separation = TRUE;
 	for (samplePoint = startScan; samplePoint < stopScan; samplePoint++)
 	{
 		if ( g_Table_Y_BitStatus[(samplePoint - startScan)%MC_DQ_DQS_BITWISE_TRIM_SAMPLING_POINTS] != 0xFFFF)
 		{
-			serial_printf("\treg= 0x%02X val= %3d bitwise ber= %d%d%d%d %d%d%d%d    %d%d%d%d %d%d%d%d\n", IP_DQ_VALUE_TO_REG(samplePoint),  samplePoint,
+			serial_printf("\treg= 0x%02X val= %3d bitwise ber= %d%d%d%d %d%d%d%d	%d%d%d%d %d%d%d%d\n", IP_DQ_VALUE_TO_REG(samplePoint),  samplePoint,
 			BINARY_PRINT16(g_Table_Y_BitStatus[(samplePoint - startScan)%MC_DQ_DQS_BITWISE_TRIM_SAMPLING_POINTS]));
 			Separation = FALSE;
 		}
-		else if (Separation==FALSE)
+		else if (Separation == FALSE)
 		{
 			serial_printf("\treg= 0x%02X val= %3d -----\n", IP_DQ_VALUE_TO_REG(samplePoint),  samplePoint);
 			Separation = TRUE;
@@ -2065,7 +2128,7 @@ static DEFS_STATUS Sweep_DQs_Trim_l (BOOLEAN bInput)
 
 
 	/*---------------------------------------------------------------------------------------------------------*/
-	/* Check results and print info                                        */
+	/* Check results and print info										   */
 	/*---------------------------------------------------------------------------------------------------------*/
 	serial_printf("\n");
 	ilane = 0;
@@ -2079,11 +2142,11 @@ static DEFS_STATUS Sweep_DQs_Trim_l (BOOLEAN bInput)
 		}
 
 		/*---------------------------------------------------------------------------------------------*/
-		/* Check if there is a valid eye (more then 5).  If not: use the original value:           */
+		/* Check if there is a valid eye (more then 5).	 If not: use the original value:		   */
 		/*---------------------------------------------------------------------------------------------*/
 		if  (g_Table_Y_BestTrim_EyeSize[ibit] < 5)
 		{
-			serial_printf(KRED "\tlane= %d; bit= %d; DQs: no eye center or eye too small, use the original value %d\n" KNRM, ilane, (ibit % 8), ( IP_DQ_REG_TO_VALUE( g_PresetTrim[ilane][ibit % 8])));
+			serial_printf(KRED "\tlane= %d; bit= %d; DQs: no eye center or eye too small, use the original value %d\n" KNRM, ilane,	(ibit % 8), ( IP_DQ_REG_TO_VALUE( g_PresetTrim[ilane][ibit % 8])));
 			g_Table_Y_BestTrim_EyeCenter[ibit] = (IP_DQ_REG_TO_VALUE( g_PresetTrim[ilane][ibit % 8]) );
 			status = DEFS_STATUS_HARDWARE_ERROR;
 		}
@@ -2100,7 +2163,7 @@ static DEFS_STATUS Sweep_DQs_Trim_l (BOOLEAN bInput)
 	}
 
 	/*---------------------------------------------------------------------------------------------------------*/
-	/*  Set new values for input trim                                          */
+	/*	Set new values for input trim										   */
 	/*---------------------------------------------------------------------------------------------------------*/
 	if ( bInput == TRUE)
 	{
@@ -2126,9 +2189,9 @@ static DEFS_STATUS Sweep_DQs_Trim_l (BOOLEAN bInput)
 				REG_WRITE(OP_DQ_DM_DQS_BITWISE_TRIM, 0x80 |  ( IP_DQ_VALUE_TO_REG(g_Table_Y_BestTrim_EyeCenter[(ilane*8 + ibit) % sizeof(g_Table_Y_BestTrim_EyeCenter) ])));
 
 				// calc sum for average ( goes to DM):
-				sum +=     IP_DQ_VALUE_TO_REG(g_Table_Y_BestTrim_EyeCenter[ilane*8 + ibit]);
+				sum +=	   IP_DQ_VALUE_TO_REG(g_Table_Y_BestTrim_EyeCenter[ilane*8 + ibit]);
 			}
-			sum = DIV_ROUND(sum, 8);           // sum is int, not UINT.. fixed around func; add +4  ( find the average of the bits)
+			sum = DIV_ROUND(sum, 8);		   // sum is int, not UINT.. fixed around func; add +4  ( find the average of the bits)
 			REG_WRITE(PHY_LANE_SEL, ilane*7 + 0x800);
 			REG_WRITE(OP_DQ_DM_DQS_BITWISE_TRIM, 0x80 | sum);
 		}
@@ -2144,13 +2207,13 @@ static DEFS_STATUS Sweep_DQs_Trim_l (BOOLEAN bInput)
 
 
 /*---------------------------------------------------------------------------------------------------------*/
-/* Function:        MC_MemStressTest                                       */
-/*                                                     */
-/* Parameters:      bECC : if true, mem test is for ECC lane. Can't sweep it directly, must check ber bit  */
-/* Returns:     bitwise error in UINT16 (one UINT8 for each lane)                      */
-/* Side effects:                                               */
-/* Description:                                                */
-/*          This routine does memory test with a list of patterns. Used for sweep.         */
+/* Function:		MC_MemStressTest									   */
+/*													   */
+/* Parameters:		bECC : if true, mem test is for ECC lane. Can't sweep it directly, must check ber bit  */
+/* Returns:		bitwise error in UINT16 (one UINT8 for each lane)					   */
+/* Side effects:											   */
+/* Description:												   */
+/*			This routine does memory test with a list of patterns. Used for sweep.		   */
 /*---------------------------------------------------------------------------------------------------------*/
 UINT16 MC_MemStressTest (BOOLEAN bECC, BOOLEAN bQuick )
 {
@@ -2159,10 +2222,10 @@ UINT16 MC_MemStressTest (BOOLEAN bECC, BOOLEAN bQuick )
 
 	const UINT32   aPtrn[6] = {0xFFFFFFFF, 0x00000000, 0x55555555, 0xAAAAAAAA, 0x33333333, 0x99999999};
 	const UINT32   iPtrnSize = 0x100;
-	const UINT     iWalkers = 0x10; // lior - there is no point to shift 0x0001 more then 16 steps ;
+	const UINT	   iWalkers = 0x10; // lior - there is no point to shift 0x0001 more then 16 steps ;
 
-	UINT32   iCnt1 = 0;
-	UINT32   iCnt2 = 0;
+	UINT32	 iCnt1 = 0;
+	UINT32	 iCnt2 = 0;
 
 #if  ((defined(DEBUG_LOG) || defined(DEV_LOG)) && defined(NPCM750))
 	extern UINT32 BOOTBLOCK_IMAGE_START;
@@ -2673,7 +2736,7 @@ static DEFS_STATUS MC_Init_l (void)
 	IOW32(MC_BASE_ADDR + (51*4), (39*(ddr_freq/10000000))  );  // 7800 / T[ns]  :
 #endif
 
-	serial_printf(KGRN ">Refresh rate is %#010lx (%d * (ddr/10000000)\n" KNRM, IOR32(MC_BASE_ADDR + (51*4)), IOR32(MC_BASE_ADDR + (51*4))/(ddr_freq/10000000) );
+	serial_printf(KNRM ">Refresh rate is %#010lx (%d * (ddr/10000000)\n", IOR32(MC_BASE_ADDR + (51*4)), IOR32(MC_BASE_ADDR + (51*4))/(ddr_freq/10000000) );
 
 	// Start Initialization Seq
 	REG_SET_FIELD(MC_BASE_ADDR + ((UINT32)(START_ADDR) * 4), START_WIDTH, START_OFFSET, 1);
@@ -2849,29 +2912,86 @@ static BOOLEAN MC_IsDDRConfigured_l (void)
 }
 
 
+/*---------------------------------------------------------------------------------------------------------*/
+/* Function:		MC_Enable_ECC_l  								   */
+/*													   */
+/* Parameters:		none										   */
+/* Returns:		                 								   */
+/* Side effects:	none										   */
+/* Description:												   */
+/*			Get the status of DDR Memory Controller initialization				   */
+/*---------------------------------------------------------------------------------------------------------*/
+static void MC_Enable_ECC_l (void)
+{
+	UINT32 clksel;
+
+
+#if  ((defined(DEBUG_LOG) || defined(DEV_LOG)) && defined(NPCM750))
+	UINT32	      iCnt2 = 0;
+	extern UINT32 BOOTBLOCK_IMAGE_START;
+	extern UINT32 BOOTBLOCK_IMAGE_END;
+	volatile UINT16   *dstAddrStart = (UINT16 *)0x1000;
+#endif
+
+
+	if ( NUM_OF_LANES != NUM_OF_LANES_MAX)
+	{
+		serial_printf(KGRN ">ECC not enalbed\n" KNRM);
+		return;
+	}
+
+	serial_printf(">Enable ECC\n");
+	clksel = REG_READ(CLKSEL);  // save clock current settings
+	SET_REG_FIELD(CLKSEL, CLKSEL_CPUCKSEL, CLKSEL_CPUCKSEL_CLKREF);  // set CPU  to CLKREF clock (25 MHz)
+	CLK_Delay_MicroSec(10);  // some delay after clock MUX change
+	IOW32(MC_BASE_ADDR + (ECC_EN_ADDR*4),			DENALI_CTL_93_DATA_ECC);  // Enable ECC
+	REG_WRITE(CLKSEL, clksel); // restore clocks to normal
+	CLK_Delay_MicroSec(10);  // some delay after clock MUX change
+	IOW32(MC_BASE_ADDR + (ECC_DISABLE_W_UC_ERR_ADDR*4), DENALI_CTL_94_DATA_ECC);
+	IOW32(MC_BASE_ADDR + 4*INT_MASK_ADDR, 0x0FFFFFFF);    // enable only ECC interrupts
+
+	serial_printf("\n\n\n");
+
+	// init memory area used for the following sweeps ( full init of memory after all sweeps are done):
+#if  ((defined(DEBUG_LOG) || defined(DEV_LOG)) && defined(NPCM750))
+	Tock();
+
+	/*---------------------------------------------------------------------------------------------*/
+	/* zero the mem test area									   */
+	/*---------------------------------------------------------------------------------------------*/
+	for( iCnt2 = 0; iCnt2 <	 (&BOOTBLOCK_IMAGE_END - &BOOTBLOCK_IMAGE_START) ; iCnt2 += sizeof(UINT16))
+	{
+		*dstAddrStart = 0;
+		dstAddrStart++;
+	}
+#endif
+
+	return;
+
+}
+
 
 /*---------------------------------------------------------------------------------------------------------*/
-/* Function:        MC_ConfigureDDR_l                                      */
-/*                                                     */
-/* Parameters:      none                                           */
-/* Returns:     status                                         */
-/* Side effects:    none                                           */
-/* Description:                                                */
-/*          Set default configuration for the DDR Memory Controller                */
+/* Function:		MC_ConfigureDDR_l									   */
+/*													   */
+/* Parameters:		none										   */
+/* Returns:		status										   */
+/* Side effects:	none										   */
+/* Description:												   */
+/*			Set default configuration for the DDR Memory Controller				   */
 /*---------------------------------------------------------------------------------------------------------*/
 static DEFS_STATUS MC_ConfigureDDR_l ( void )
 {
-	DEFS_STATUS       status =  DEFS_STATUS_OK;
-	DEFS_STATUS   status_out_sweep =  DEFS_STATUS_OK;
-	int       itrCnt_l = 1;
-	UINT32        ilane = 0;
-	int          l_BestEyeCenter[NUM_OF_LANES_MAX], l_BestEyeSize[NUM_OF_LANES_MAX];
+	DEFS_STATUS	  status =	DEFS_STATUS_OK;
+	DEFS_STATUS	  status_out_sweep =  DEFS_STATUS_OK;
+	int		  itrCnt_l = 1;
+	int               l_BestEyeCenter[NUM_OF_LANES_MAX], l_BestEyeSize[NUM_OF_LANES_MAX];
 
 
 
 	/*-----------------------------------------------------------------------------------------------------*/
 	/* DLL trim: start at max value (26), calc the best trim, try it on the second iterration. If it fails,*/
-	/* increas by 5 and retry till found a valid point.                            */
+	/* increas by 5 and retry till found a valid point.							   */
 	/*-----------------------------------------------------------------------------------------------------*/
 	dlls_trim_adrctl_clk  = 26; // value of 0 works in EB and SVB but not in Dell system, value of 5 works in Dell system.
 
@@ -2927,33 +3047,32 @@ static DEFS_STATUS MC_ConfigureDDR_l ( void )
 	} while (status != DEFS_STATUS_OK);
 
 	/*-------------------------------------------------------------------------------------------------*/
-	/* VREF training and RW bit leveling                                   */
+	/* VREF training and RW bit leveling								   */
 	/*-------------------------------------------------------------------------------------------------*/
 	status = phy_leveling_l(PHY_VREF_TRNG|PHY_RW_BIT_LVL);
 
-
 	/*--------------------------------------------------------------------*/
-	/*      MC enhanced eye training                  */
+	/*		MC enhanced eye training			      */
 	/*--------------------------------------------------------------------*/
-	if(!(g_mc_config & MC_DISABLE_CAPABILITY_INPUT_DQS_ENHANCE_TRAINING))
+	if (status == DEFS_STATUS_OK)
 	{
-		if (status == DEFS_STATUS_OK)
+		if(!(g_mc_config & MC_DISABLE_CAPABILITY_INPUT_DQS_ENHANCE_TRAINING))
 		{
-			Sweep_Input_DSQ_Enhanced_Training_l(FALSE);
+			status = Sweep_Input_DSQ_Enhanced_Training_l();
+			if (status != DEFS_STATUS_OK)
+				return status;
 		}
 
-	} else {  // MC_DISABLE_CAPABILITY_INPUT_DQS_ENHANCE_TRAINING
-
-		if (status == DEFS_STATUS_OK)
-		{
-			// continue with read-leveling
-			status = phy_leveling_l(PHY_RD_LVL);
-		}
+		// continue with read-leveling
+		status = phy_leveling_l(PHY_RD_LVL);
 	}
 
 
+	REG_WRITE(PHY_LANE_SEL, 0);
+
+
 	/*-----------------------------------------------------------------------------------------------------*/
-	/* Run output and input delay sweep                                    */
+	/* Run output and input delay sweep                                                                    */
 	/*-----------------------------------------------------------------------------------------------------*/
 	if (status == DEFS_STATUS_OK)
 	{
@@ -2961,237 +3080,174 @@ static DEFS_STATUS MC_ConfigureDDR_l ( void )
 		status = Sweep_DQs_Trim_l(TRUE); // Run Parametric Sweep on READ side and find the center for each DQn.
 
 		// If output failed but input pass, maybe all we need is a second output sweep for fine tune the output after input was fine tuned.
-		if ( (status == DEFS_STATUS_OK) && (status_out_sweep !=DEFS_STATUS_OK) )
+		if ( (status == DEFS_STATUS_OK) && (status_out_sweep != DEFS_STATUS_OK) )
 			status = Sweep_DQs_Trim_l(FALSE);
 
-		if (status == DEFS_STATUS_OK)
+		/*-----------------------------------------------------------------------------------------*/
+		/*  sweep DQS (final centering) no ecc                                                     */
+		/*-----------------------------------------------------------------------------------------*/
+		if(status == DEFS_STATUS_OK)
 		{
 			status = Sweep_Trim_Input_DQS_l(l_BestEyeCenter, l_BestEyeSize, FALSE, FALSE);
-			if ((NUM_OF_LANES == NUM_OF_LANES_MAX) && (status == DEFS_STATUS_OK))
-				status = Sweep_Trim_Input_DQS_l(l_BestEyeCenter, l_BestEyeSize, TRUE, FALSE);
-
-
-			/*--------------------------------------------------------------------*/
-			/*      MC enhanced eye training: results                             */
-			/*--------------------------------------------------------------------*/
-
-			if(!(g_mc_config & MC_DISABLE_CAPABILITY_INPUT_DQS_ENHANCE_TRAINING))
-			{
-
-				for (ilane = 0; ilane < NUM_OF_LANES; ilane++)
-				{
-					serial_printf(KGRN "lane%d: inputDQS: eye size %d, DQS delay = %d\n" KNRM,
-						ilane,
-						l_BestEyeSize[ilane],
-						l_BestEyeCenter[ilane]);
-
-					// Check that the window after selecting is still big enough
-					if (l_BestEyeSize[ilane] <  28)
-					{
-						serial_printf(KRED "ERROR: final inputDQS window is still too small despite the sweep\n" KNRM);
-						status = DEFS_STATUS_FAIL ; // return everything from scartch.
-					}
-				}
-
-				// Final set value is:
-				for (ilane = 0; ilane < NUM_OF_LANES; ilane++)
-				{
-					REG_WRITE(PHY_LANE_SEL,(ilane*7)+(8<<8));
-					serial_printf(KGRN "lane%d: final input DQS : 0x%x\n" KNRM,
-						ilane, READ_REG_FIELD(IP_DQ_DQS_BITWISE_TRIM, IP_DQ_DQS_BITWISE_TRIM_ip_dq_dqs_bitwise_trim_reg));
-				}
-			} // MC_DISABLE_CAPABILITY_INPUT_DQS_ENHANCE_TRAINING
 		}
 	}
+
 
 	return status;
 }
 
 
 /*---------------------------------------------------------------------------------------------------------*/
-/* Function:        Sweep_Input_DSQ_Enhanced_Training_l                        */
-/*                                                     */
-/* Parameters:      bECC                                           */
-/* Returns:     status                                         */
-/* Side effects:    none                                           */
-/* Description:                                                */
-/*          Enhanced training for Input DQS                            */
+/* Function:		Sweep_Input_DSQ_Enhanced_Training_l						   */
+/*													   */
+/* Parameters:		None										   */
+/* Returns:		status										   */
+/* Side effects:	none										   */
+/* Description:												   */
+/*			Enhanced training for Input DQS							   */
 /*---------------------------------------------------------------------------------------------------------*/
-static DEFS_STATUS Sweep_Input_DSQ_Enhanced_Training_l(BOOLEAN bECC)
+static DEFS_STATUS Sweep_Input_DSQ_Enhanced_Training_l(void)
 {
-	DEFS_STATUS     status = DEFS_STATUS_OK;
-	UINT        laneStart = 0;
-	UINT        laneStop = NUM_OF_LANES_MAX - 1;
-	UINT        ilane = 0;
-	UINT32      input_DQS_delay_cur;
-
-	int     l_inputDelayTableEyeSize[NUM_OF_LANES_MAX][0x40];
-	//int       l_bestInputDQS[NUM_OF_LANES_MAX] = {0,0,0};
-	//int       l_bestWindowInputDQS[NUM_OF_LANES_MAX] = {0,0,0};
-
-	int     l_InputDQS[NUM_OF_LANES_MAX] = {0,0,0};
-	int     l_WindowInputDQS[NUM_OF_LANES_MAX] = {0,0,0};
-
-	int          l_bestInputDQS[8*NUM_OF_LANES_MAX], l_bestWindowInputDQS[8*NUM_OF_LANES_MAX];
-
-	if (bECC == TRUE)
-	{
-		laneStart  = NUM_OF_LANES_MAX - 1;
-		laneStop   = NUM_OF_LANES_MAX;
-		serial_printf("Enhanced sweep input DQS delay using read leveling for best eye size, ECC lane\n");
-	}
-	else
-	{
-		// first call to this function iswithou ECC.
-		memset(l_inputDelayTableEyeSize, -1, sizeof(l_inputDelayTableEyeSize));
-		memset(l_bestWindowInputDQS,     -1, sizeof(l_bestWindowInputDQS));
-		memset(l_bestInputDQS,           -1, sizeof(l_bestInputDQS));
-		serial_printf("Enhanced sweep input DQS delay using read leveling for best eye size\n");
-	}
+	DEFS_STATUS 	status = DEFS_STATUS_OK;
+	UINT		laneStart = 0;
+	UINT		laneStop = NUM_OF_LANES;
+	UINT		ilane = 0;
+	UINT32     	l_DQS;
+	UINT32          l_dll_mas_dly, l_dll_slv_dly_wire, l_dll_half_dly, l_Start_DQS, l_End_DQS;
+	UINT32          l_prev_clk_dly[NUM_OF_LANES_MAX] = {0,0,0};
+        UINT32          l_good_DQS[NUM_OF_LANES_MAX] = {0,0,0};
+        UINT32          l_main_clk_dly = 0 ;
+        UINT32          l_done = 0;
+        UINT32          l_main_clk_delta_dly = 0;
+        UINT32          l_clk_dly = 0;
 
 
+	// get the number of delay elements corresponds to one clock cycle
+	l_dll_mas_dly = READ_REG_FIELD(PHY_DLL_ADRCTRL, PHY_DLL_ADRCTRL_dll_mas_dly); // number delay elements in 1 clock cycle
+	l_dll_slv_dly_wire = READ_REG_FIELD(PHY_DLL_ADRCTRL, PHY_DLL_ADRCTRL_dll_slv_dly_wire); // number delay elements in 1/4 clock cycle
+	l_dll_half_dly = (l_dll_mas_dly + 1) >> 1; // number delay elements in 1/2 clock cycle
+
+	// Start DQS_IP and DQS_OP values with number delay elements in 1/2 clock cycle.
+        // We can't start with 0 since DQS_IP value is used as base value for DQn that are negative value. (e.g., delay <0..63> = DQS_IP + DQn)
+        // In addition we want an option to sweep DQn easily with negative values and reach window edge.
+        l_Start_DQS = l_dll_half_dly;      // alternative use 0x18 that is good for 667MHz and 800MHz
+        l_End_DQS = MIN(0x3F - l_dll_half_dly, l_Start_DQS + l_dll_half_dly); // alternative use 0x2C that is good for 667MHz and 800MHz
+
+
+	serial_printf("Enhanced sweep input DQS delay using read leveling for best eye size, from 0x%x to 0x%x (1 cycle delay elements:%d, 1/4 cycle:%d)\n",
+			l_Start_DQS, l_End_DQS, l_dll_mas_dly, l_dll_slv_dly_wire);
 
 	/*---------------------------------------------------------------------------------------------*/
-	/* Sweep input DQS delay against window size                                */
+	/* Sweep input DQS delay against window size            		                	*/
 	/*---------------------------------------------------------------------------------------------*/
-	for (input_DQS_delay_cur = 0x8; input_DQS_delay_cur < 0x40 ; input_DQS_delay_cur++)
+	for (l_DQS = l_Start_DQS; l_DQS < l_End_DQS ; l_DQS++)
 	{
 
+		serial_printf("Set 0x%x to in DQS and out DQS (all lanes)\n", l_DQS);
 		/*-----------------------------------------------------------------------------------------*/
-		/* Init DQS input delay                                                                */
+		/* Init DQS input delay									   */
 		/*-----------------------------------------------------------------------------------------*/
 		for (ilane = laneStart; ilane < laneStop; ilane++)
 		{
-			REG_WRITE(PHY_LANE_SEL,(ilane*7) + 0x800);
-			REG_WRITE(IP_DQ_DQS_BITWISE_TRIM, 0x80 | (0x7F & input_DQS_delay_cur)); // input DQS
+			Set_DQS_in_val(ilane, l_DQS,  FALSE);
+			Set_DQS_out_val(ilane, l_DQS, FALSE);
 		}
 
 
 		// dummy accsess to DDR
-		IOW32 (0x1000,IOR32(0x1000));
+		IOW32 (0x1000, IOR32(0x1000));
 		REG_WRITE(PHY_LANE_SEL, 0);
 
 		/*-----------------------------------------------------------------------------------------*/
-		/* Read leveling                                                                            */
+		/* Read leveling                                                                           */
 		/*-----------------------------------------------------------------------------------------*/
-		status = phy_leveling_l(PHY_RD_LVL_FAST);
+		status = phy_leveling_l(PHY_RD_LVL);
+
+		REG_WRITE(PHY_LANE_SEL, 0);
+		IOW32 (0x1000, IOR32(0x1000));
 
 		/*-----------------------------------------------------------------------------------------*/
-		/* Sweep input DQS in order to get window size after read leveling                      */
+		/* Sweep input DQS in order to get window size after read leveling			   */
 		/*-----------------------------------------------------------------------------------------*/
 		if (status == DEFS_STATUS_OK)
 		{
-			status = Sweep_Trim_Input_DQS_l(l_InputDQS, l_WindowInputDQS, bECC, TRUE);
+			l_main_clk_dly = READ_REG_FIELD(SCL_LATENCY, SCL_LATENCY_main_clk_dly);
+
 			for (ilane = laneStart; ilane < laneStop; ilane++)
-				serial_printf_debug("enh sweep res: lane%d bestin %d size %d\n",
-					ilane, l_InputDQS[ilane], l_WindowInputDQS[ilane]);
+			{
+				// store the first DQS value that pass read-leveling
+				if (l_good_DQS[ilane] == 0)
+				{
+					l_good_DQS[ilane] = l_DQS;
+					l_prev_clk_dly[ilane] = (UINT32)(-1);
+				}
+
+
+				if (READ_VAR_BIT(l_done, ilane) == 0)
+				{
+					//-----------------------------------------------------------
+					// check l_clk_dly (main_clk_delta_dly and main_clk_dly)
+					// l_main_clk_delta_dly is typically 0 for all lanes, unless delay value is on the edge so one of l_main_clk_delta_dly is 1 and other is 0.
+					//-----------------------------------------------------------
+					REG_WRITE(PHY_LANE_SEL, (ilane * 3));
+					l_main_clk_delta_dly = READ_REG_FIELD(SCL_MAIN_CLK_DELTA, SCL_MAIN_CLK_DELTA_main_clk_delta_dly);
+					l_clk_dly = l_main_clk_dly - l_main_clk_delta_dly;
+
+					//---------------------------------------------------------------------------------------------
+					// look for a jump on main_clk_delta_dly and main_clk_dly values -- this jump indicates a wide window size
+					//---------------------------------------------------------------------------------------------
+					if (l_clk_dly > l_prev_clk_dly[ilane])
+					{
+						// found a jump
+						serial_printf("> Lane%d: Found wide window size at: IP_DQS=0x%02X, OP_DQS=0x%02X l_clk_dly = %d\n",
+							ilane, l_DQS, l_DQS, l_clk_dly);
+						l_good_DQS[ilane] = l_DQS;
+						SET_VAR_BIT(l_done, ilane);
+					}
+
+					l_prev_clk_dly[ilane] = l_clk_dly;
+				}
+			}
 		}
 
+		// if read leveling failed:
 		else // no valid window:
 		{
 			serial_printf("Enhanced training: read leveling failed\n");
-			for (ilane = laneStart; ilane < laneStop; ilane++)
-				l_inputDelayTableEyeSize[ilane][input_DQS_delay_cur] = 0;
+			Set_DQS_in_val(ilane, 0x1F,  TRUE);
+			Set_DQS_out_val(ilane, 0x1F, TRUE);
+			return DEFS_STATUS_FAIL;
+
 		}
 
-
-		// save the eye size results in l_inputDelayTableEyeSize
-		for (ilane = laneStart; ilane < laneStop ; ilane++)
-		{
-			l_inputDelayTableEyeSize[ilane][input_DQS_delay_cur] = l_WindowInputDQS[ilane];
-			serial_printf_debug("enh sweep res set: lane%d keep %d val %d\n",
-					ilane, l_inputDelayTableEyeSize[ilane][input_DQS_delay_cur], l_bestWindowInputDQS[ilane]);
-		}
+		// found a step on each of the lanes.
+		if (l_done == LANE_MASK)
+			break;
 
 
-
-		/*-----------------------------------------------------------------------------------------*/
-		/* check what is best value for DQS: Check which input DQS value gives the maximum window   */
-		/* Need to find 5 consequtive measures above 28 and after max                               */
-		/*-----------------------------------------------------------------------------------------*/
-		for (ilane = laneStart; ilane < laneStop; ilane++)
-		{
-			/* find max :*/
-			if (l_inputDelayTableEyeSize[ilane][input_DQS_delay_cur] > l_bestWindowInputDQS[ilane])
-			{
-				l_bestWindowInputDQS[ilane] = l_inputDelayTableEyeSize[ilane][input_DQS_delay_cur];
-				l_bestInputDQS[ilane] = input_DQS_delay_cur ;
-			}
-		}
-
-		/*-----------------------------------------------------------------------------------------*/
-		/* Read leveling  (quick with no prints)                                                    */
-		/*-----------------------------------------------------------------------------------------*/
-		status = phy_leveling_l(PHY_RD_LVL_FAST);
 	}
 
+
 	/*---------------------------------------------------------------------------------------------*/
-	/* Check results and make sure we have 5 consequtive spots after max                            */
+	/* Init DQS input delay to selected value + 1 : leave a gap from "shen masor"			*/
 	/*---------------------------------------------------------------------------------------------*/
 	for (ilane = laneStart; ilane < laneStop; ilane++)
 	{
-		for (input_DQS_delay_cur = l_bestInputDQS[ilane]; input_DQS_delay_cur < (0x40 - 5) ; input_DQS_delay_cur++)
-		{
-			/* 5 consecutive from max above 28 window (matches 350 ps jitter tolerance):*/
-			if  (   (l_inputDelayTableEyeSize[ilane][input_DQS_delay_cur] < 28) ||
-					(l_inputDelayTableEyeSize[ilane][input_DQS_delay_cur+1] < 28) ||
-					(l_inputDelayTableEyeSize[ilane][input_DQS_delay_cur+2] < 28) ||
-					(l_inputDelayTableEyeSize[ilane][input_DQS_delay_cur+3] < 28) ||
-					(l_inputDelayTableEyeSize[ilane][input_DQS_delay_cur+4] < 28))
-			{
-				serial_printf("move lane%d, iDQS = %d, eye size = %d\n", ilane, input_DQS_delay_cur, l_inputDelayTableEyeSize[ilane][input_DQS_delay_cur]);
-			}
-			else // found it, take the middle:
-			{
-				l_bestInputDQS[ilane] = input_DQS_delay_cur + 2;
-				l_bestWindowInputDQS[ilane] = l_inputDelayTableEyeSize[ilane][l_bestInputDQS[ilane]];
-				serial_printf_debug("lane%d, final best iDQS = %d, eye size = %d\n", ilane, l_bestInputDQS[ilane], l_inputDelayTableEyeSize[ilane][l_bestInputDQS[ilane]]);
-				break; // found it ( per lane ).
-			}
-		}
+		serial_printf(KGRN "Enhanced results lane%d: Set final value in and out DQS delay 0x%x\n" KNRM, ilane, l_good_DQS[ilane] + 1);
+		Set_DQS_in_val(ilane, l_good_DQS[ilane] + 1,  FALSE);
+		Set_DQS_out_val(ilane, l_good_DQS[ilane] + 1, FALSE);
+
 	}
 
-	//Print input DQS delay vs. eye size sweep results
-	serial_printf(KGRN "Input DQS and eye size (per lane):\n" KNRM "in delay:  " );
-	for (input_DQS_delay_cur = 0x8; input_DQS_delay_cur < 0x40 ; input_DQS_delay_cur++)
-	{
-		serial_printf("%02d ", input_DQS_delay_cur);
-	}
+	//serial_printf(KGRN "For tests: ignore enhanced on ECC lane\n" KNRM);
 
-	for (ilane = laneStart; ilane < laneStop; ilane++)
-	{
-		serial_printf("\neyesize L%d:", ilane);
-		for (input_DQS_delay_cur = 0x8; input_DQS_delay_cur < 0x40 ; input_DQS_delay_cur++)
-		{
-			if ( input_DQS_delay_cur == l_bestInputDQS[ilane])
-				serial_printf(KGRN);
-			serial_printf("%02d " KNRM, l_inputDelayTableEyeSize[ilane][input_DQS_delay_cur]);
-		}
-	}
 
-	serial_printf("\n");
+	//Set_DQS_in_val(2, 0x1F, TRUE);
+	//Set_DQS_out_val(2, 0x1F, TRUE);
 
-	/*---------------------------------------------------------------------------------------------*/
-	/* Init DQS input delay to selected value + 2 : leave a gap from "shen masor"           */
-	/*---------------------------------------------------------------------------------------------*/
-	for (ilane = laneStart; ilane < laneStop; ilane++)
-	{
-
-		REG_WRITE(PHY_LANE_SEL,(ilane*7)+(8<<8));
-		REG_WRITE(IP_DQ_DQS_BITWISE_TRIM, 0x80 | 0x7F & (l_bestInputDQS[ilane])); // input DQS
-		serial_printf(KGRN "Enhanced results: Lane%d: Set input DQS delay %d\n" KNRM, ilane, l_bestInputDQS[ilane]);
-	}
-
-	// dummy accsess to DDR (07/AUG/2016)
-	IOW32 (0x1000,IOR32(0x1000));
+	// dummy accsess to DDR
+	IOW32 (0x1000, IOR32(0x1000));
 	REG_WRITE(PHY_LANE_SEL, 0);
-
-	/*-----------------------------------------------------------------------------------------*/
-	/* Read leveling                                    */
-	/*-----------------------------------------------------------------------------------------*/
-	status = phy_leveling_l(PHY_RD_LVL);
-
-
 
 	return status;
 }
@@ -3199,13 +3255,13 @@ static DEFS_STATUS Sweep_Input_DSQ_Enhanced_Training_l(BOOLEAN bECC)
 
 
 /*---------------------------------------------------------------------------------------------------------*/
-/* Function:        MC_ConfigureDDR                                    */
-/*                                                     */
-/* Parameters:      UINT8 mc_config : value from  BOOTBLOCK_Get_MC_config (BB header)              */
-/* Returns:     status                                         */
-/* Side effects:    none                                           */
-/* Description:                                                */
-/*          Set default configuration for the DDR Memory Controller                */
+/* Function:		MC_ConfigureDDR									   */
+/*													   */
+/* Parameters:		UINT8 mc_config : value from  BOOTBLOCK_Get_MC_config (BB header)			   */
+/* Returns:		status										   */
+/* Side effects:	none										   */
+/* Description:												   */
+/*			Set default configuration for the DDR Memory Controller				   */
 /*---------------------------------------------------------------------------------------------------------*/
 DEFS_STATUS MC_ConfigureDDR ( UINT8 mc_config )
 {
@@ -3215,15 +3271,7 @@ DEFS_STATUS MC_ConfigureDDR ( UINT8 mc_config )
 	UINT32        iCnt = 0;
 	DEFS_STATUS   status_out_sweep =  DEFS_STATUS_OK;
 	DEFS_STATUS   status_dqs_sweep =  DEFS_STATUS_OK;
-	int          l_BestEyeCenter[8*NUM_OF_LANES_MAX], l_BestEyeSize[8*NUM_OF_LANES_MAX];
-
-
-#if  ((defined(DEBUG_LOG) || defined(DEV_LOG)) && defined(NPCM750))
-	UINT32        iCnt2 = 0;
-	extern UINT32 BOOTBLOCK_IMAGE_START;
-	extern UINT32 BOOTBLOCK_IMAGE_END;
-	volatile UINT16   *dstAddrStart = (UINT16 *)0x1000;
-#endif
+	int		 l_BestEyeCenter[8*NUM_OF_LANES_MAX], l_BestEyeSize[8*NUM_OF_LANES_MAX];
 
 	g_mc_config = mc_config;
 
@@ -3253,7 +3301,7 @@ DEFS_STATUS MC_ConfigureDDR ( UINT8 mc_config )
 
 	for (try = 1; try < 6; try++)
 	{
-		serial_printf("\n\n ****** DDR4 Init (Trial #%d) mc_config = 0x%x *******\n", try, mc_config);
+		serial_printf(KCYN "\n\n ****** DDR4 Init (Trial #%d) mc_config = 0x%x *******\n" KNRM, try, g_mc_config);
 
 		status = MC_ConfigureDDR_l();
 		MC_PrintRegs();
@@ -3263,6 +3311,12 @@ DEFS_STATUS MC_ConfigureDDR ( UINT8 mc_config )
 			SDRAM_PrintRegs(); // Only when MC was init. When MC was not init, can't read/write MR registers.
 			serial_printf("\n\n");
 			break;
+		}
+
+		if (try == 3)
+		{
+			serial_printf(KCYN "\nAfter 3 re-tries, disable enhance training (if enabled)\n" KNRM);
+			g_mc_config |= MC_DISABLE_CAPABILITY_INPUT_DQS_ENHANCE_TRAINING;
 		}
 	}
 
@@ -3284,49 +3338,15 @@ DEFS_STATUS MC_ConfigureDDR ( UINT8 mc_config )
 	MC_UpdateDramSize(dramSize);
 
 	/*-----------------------------------------------------------------------------------------------------*/
-	/* Check if ECC device is selected  : init the memory size and enable ECC                  */
+	/* Check if ECC device is selected  : init the memory size and enable ECC				   */
 	/*-----------------------------------------------------------------------------------------------------*/
 	if ( LANE_MASK == LANE_MASK_MAX)
 	{
-#ifdef ECC_GLITCH_BYPASS
-		UINT32 clksel;
-
-		serial_printf(">Enable ECC (training ECC passed)\n");
-		clksel = REG_READ(CLKSEL);  // save clock current settings
-		SET_REG_FIELD(CLKSEL, CLKSEL_CPUCKSEL, CLKSEL_CPUCKSEL_CLKREF);  // set CPU  to CLKREF clock (25 MHz)
-		CLK_Delay_MicroSec(10);  // some delay after clock MUX change
-		IOW32(MC_BASE_ADDR + (ECC_EN_ADDR*4),           DENALI_CTL_93_DATA_ECC);  // Enable ECC
-		REG_WRITE(CLKSEL, clksel); // restore clocks to normal
-		CLK_Delay_MicroSec(10);  // some delay after clock MUX change
-#else
-		serial_printf(">Enable ECC (training ECC passed)\n");
-		IOW32(MC_BASE_ADDR + (ECC_EN_ADDR*4),           DENALI_CTL_93_DATA_ECC);  // Enable ECC
-#endif
-		IOW32(MC_BASE_ADDR + (ECC_DISABLE_W_UC_ERR_ADDR*4), DENALI_CTL_94_DATA_ECC);
-
-		IOW32(MC_BASE_ADDR + 4*INT_MASK_ADDR, 0x0FFFFFFF);    // enable only ECC interrupts
-
-
-		serial_printf("\n\n\n");
-
-
-#if  ((defined(DEBUG_LOG) || defined(DEV_LOG)) && defined(NPCM750))
-		Tock();
-
-
-		/*---------------------------------------------------------------------------------------------*/
-		/* zero the mem test area                                      */
-		/*---------------------------------------------------------------------------------------------*/
-		for( iCnt2 = 0; iCnt2 <  (&BOOTBLOCK_IMAGE_END - &BOOTBLOCK_IMAGE_START) ; iCnt2 += sizeof(UINT16))
-		{
-			*dstAddrStart = 0;
-			dstAddrStart++;
-		}
-#endif
-
+		// Enable ECC
+		MC_Enable_ECC_l();
 
 		/*---------------------------------------------------------------------------------------------------------*/
-		/* ECC: Sweep ECC DQs (in and out and DQS)                                 */
+		/* ECC: Sweep ECC DQs (in and out and DQS)								   */
 		/*---------------------------------------------------------------------------------------------------------*/
 		status_out_sweep = Sweep_DQs_ECC_Trim_l(FALSE); // Run Parametric Sweep on WRITE side (both Output DQn and DM) and find the center for each DQn and average for each DM lane. (Note: assume DM length is average of data length)
 		status       = Sweep_DQs_ECC_Trim_l(TRUE); // Run Parametric Sweep on READ side and find the center for each DQn.
@@ -3337,16 +3357,9 @@ DEFS_STATUS MC_ConfigureDDR ( UINT8 mc_config )
 
 
 		/*--------------------------------------------------------------------*/
-		/* ECC: enhanced eye training for lane (or simple sweep if enhanced is disabled) */
+		/* ECC: DQS sweep                                                     */
 		/*--------------------------------------------------------------------*/
-		if(!(g_mc_config & MC_DISABLE_CAPABILITY_INPUT_DQS_ENHANCE_TRAINING))
-		{
-			status_dqs_sweep = Sweep_Input_DSQ_Enhanced_Training_l(TRUE);
-		}
-		else
-		{
-			status_dqs_sweep = Sweep_Trim_Input_DQS_l(l_BestEyeCenter, l_BestEyeSize, TRUE, FALSE);
-		}
+		status_dqs_sweep = Sweep_Trim_Input_DQS_l(l_BestEyeCenter, l_BestEyeSize, TRUE, FALSE);
 
 
 		if ((status != DEFS_STATUS_OK) || (status_out_sweep != DEFS_STATUS_OK) || (status_dqs_sweep != DEFS_STATUS_OK))
@@ -3398,7 +3411,7 @@ DEFS_STATUS MC_ConfigureDDR ( UINT8 mc_config )
 }
 
 /*---------------------------------------------------------------------------------------------------------*/
-/* Function:        MC_UpdateDramSize                                      */
+/* Function:		MC_UpdateDramSize									   */
 /*                                                     */
 /* Parameters:      none                                           */
 /* Returns:     none                                           */
@@ -3494,7 +3507,7 @@ static void MC_PrintLeveling (BOOLEAN bIn, BOOLEAN bOut)
 
 			ibit = 8;
 			REG_WRITE(PHY_LANE_SEL,(ilane*7)+((UINT32)ibit<<8));
-			serial_printf("     DQS:0x%02X, ",(UINT8) (REG_READ(IP_DQ_DQS_BITWISE_TRIM) & 0x7f));
+			serial_printf("		DQS:0x%02X, ",(UINT8) (REG_READ(IP_DQ_DQS_BITWISE_TRIM) & 0x7f));
 
 			REG_WRITE(PHY_LANE_SEL,(ilane*6));
 			if (((REG_READ(PHY_DLL_INCR_TRIM_3)>>ilane) & 0x01)==0x01)
@@ -3538,7 +3551,7 @@ void MC_PrintRegs (void)
 	UINT32 g_DllClockCycle = 0;
 
 	serial_printf("\n************\n");
-	serial_printf("* MC  Info *\n");
+	serial_printf("* MC	 Info *\n");
 	serial_printf("************\n\n");
 
 	//---------------------------------------------------------------
@@ -3774,7 +3787,7 @@ static void SDRAM_PrintRegs (void)
 /*---------------------------------------------------------------------------------------------------------*/
 void MC_PrintVersion (void)
 {
-	serial_printf("MC          = %d\n", MC_MODULE_TYPE);
+	serial_printf("MC		   = %d\n", MC_MODULE_TYPE);
 }
 
 #else // no printouts ( used for the monitor).
@@ -3890,7 +3903,7 @@ static DEFS_STATUS MPR_Page_Readout (UINT8 Page, /*OUT*/ UINT8 *MPR)
 		*MPR = tmp_data;
 		MPR++;
 	}
-	return (DEFS_STATUS_OK);
+	return DEFS_STATUS_OK;
 }
 
 /*---------------------------------------------------------------------------------------------------------*/
@@ -3916,18 +3929,18 @@ static DEFS_STATUS WriteModeReg(UINT8 Index, UINT32 Data)
 	MC_Sleep_l(1); // ~ 10usec
 	while (1)
 	{
-		if ( ((IOR32(MC_BASE_ADDR + (INT_STATUS_ADDR*4))>>25) & 0x01) == 0x01)  // DENALI_CTL_116.25
+		if ( ((IOR32(MC_BASE_ADDR + (INT_STATUS_ADDR*4))>>25) & 0x01) == 0x01)	// DENALI_CTL_116.25
 		{
 			if  ( (IOR32(MC_BASE_ADDR + (71*4)) & 0xFF) == 0x01 ) // DENALI_CTL_71.MRW_STATUS
-			return (DEFS_STATUS_FAIL);
+				return DEFS_STATUS_FAIL;
 			else
-			return (DEFS_STATUS_OK);
+				return DEFS_STATUS_OK;
 		}
 
 		if (TimeOut==0)
 		{
 			serial_printf(KRED "\t>WriteModeReg::TimeOut\n" KNRM);
-			return (DEFS_STATUS_FAIL);
+				return DEFS_STATUS_FAIL;
 		}
 
 		TimeOut--;

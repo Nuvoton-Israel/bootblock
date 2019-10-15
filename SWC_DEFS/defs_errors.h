@@ -115,12 +115,12 @@ typedef enum
 /* Macro:           DEFS_STATUS_RET_CHECK                                                                  */
 /*                                                                                                         */
 /* Parameters:                                                                                             */
-/*                  func    - function to check                                                            */
+/*                  func    - Function to check                                                            */
 /*                                                                                                         */
 /* Returns:                                                                                                */
 /* Side effects:                                                                                           */
 /* Description:                                                                                            */
-/*                  This macro checks if give function returns DEFS_STATUS error, and returns the error    */
+/*                  This macro checks if given function returns DEFS_STATUS error, and returns the error   */
 /*                  immediately                                                                            */
 /*                                                                                                         */
 /* Example:                                                                                                */
@@ -151,16 +151,18 @@ typedef enum
 /* Macro:           DEFS_STATUS_RET_CHECK_ACTION                                                           */
 /*                                                                                                         */
 /* Parameters:                                                                                             */
-/*                  func    - function to check                                                            */
+/*                  func    - Function to check                                                            */
 /*                  action  - Action done if function doesn't return DEFS_STATUS_OK                        */
 /*                                                                                                         */
 /* Returns:                                                                                                */
 /* Side effects:                                                                                           */
 /* Description:                                                                                            */
-/*                  This macro checks if give function returns DEFS_STATUS error, if not in performs       */
+/*                  This macro checks if given function returns DEFS_STATUS error, if not in performs      */
 /*                  a pre-defined action                                                                   */
 /*                                                                                                         */
 /* Example:                                                                                                */
+/*                                                                                                         */
+/*    DEFS_STATUS myFunc(INT p1, INT p2);                                                                  */
 /*                                                                                                         */
 /*    status myFirstFunc(void* ptr)                                                                        */
 /*    {                                                                                                    */
@@ -243,10 +245,38 @@ typedef enum
 
 
 /*---------------------------------------------------------------------------------------------------------*/
+/* Macro:           DEFS_STATUS_ERR_CHECK                                                                  */
+/*                                                                                                         */
+/* Parameters:                                                                                             */
+/*                  func    - Function to check                                                            */
+/*                                                                                                         */
+/* Returns:                                                                                                */
+/* Side effects:                                                                                           */
+/* Description:                                                                                            */
+/*                  This macro returns TRUE if given function returns DEFS_STATUS error;                   */
+/*                  Otherwise it returns FALSE.                                                            */
+/*                                                                                                         */
+/* Example:                                                                                                */
+/*                                                                                                         */
+/*    DEFS_STATUS myFunc(INT p1, INT p2);                                                                  */
+/*                                                                                                         */
+/*    status otherFunc                                                                                     */
+/*    {                                                                                                    */
+/*        ...                                                       // Some code                           */
+/*        BOOLEAN error = DEFS_STATUS_ERR_CHECK(myFunc(p1,p2));     // Executing myFunc                    */
+/*        ...                                                                                              */
+/*    }                                                                                                    */
+/*                                                                                                         */
+/*                                                                                                         */
+/*---------------------------------------------------------------------------------------------------------*/
+#define DEFS_STATUS_ERR_CHECK(func)             (BOOLEAN)((func) ^ DEFS_STATUS_OK)
+
+
+/*---------------------------------------------------------------------------------------------------------*/
 /* Macro:           DEFS_STATUS_RET_ASSERT                                                                 */
 /*                                                                                                         */
 /* Parameters:                                                                                             */
-/*                  func        - Function to check                                                        */
+/*                  func    - Function to check                                                            */
 /*                                                                                                         */
 /* Returns:                                                                                                */
 /* Side effects:                                                                                           */

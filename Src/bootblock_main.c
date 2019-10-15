@@ -115,7 +115,7 @@ void bootblock_main (void)
 					pllcon0, pllcon1, pllcon2, vsrcr, intcr2, ressr, mfsel4, mfsel3, mfsel2,
 					mfsel1, dscnt, smc_ctl, gpdout7, gpoe7, fiu_drd_, fiu_dwr_, fiu_cfg_0,
 					fiu_cfg_3, flockr1, rlockr1, fcfg1, fcfg2, mdlr, spswc, uart_lcr2,
-					uart_lcr3, ipsrst2 , etsr, scrpad, pwron, fustrap;
+					uart_lcr3, ipsrst2 , etsr, scrpad, pwron, fustrap, intcr3, intcr;
 	UINT32			rcr = 0;
 
 #ifdef _UNIT_TEST_
@@ -214,6 +214,8 @@ void bootblock_main (void)
 	scrpad  = REG_READ(SCRPAD  );
 	pwron   = REG_READ(PWRON   );
 	fustrap = REG_READ(FUSTRAP );
+	intcr3  = REG_READ(INTCR3  );
+	intcr   = REG_READ(INTCR   );
 
 
 	if (CFG_GetResetNum() == 0)
@@ -272,7 +274,7 @@ void bootblock_main (void)
 	BOOTBLOCK_Init_UART_Vendor();
 
 #ifdef _UNIT_TEST_
-	header = (BOOT_HEADER_T*)0x80000000;
+	header = (BOOT_HEADER_T*)SPI0CS0_BASE_ADDR;
 	BOOTBLOCK_unit_test_1((BOOT_HEADER_T *)header);
 #endif
 
@@ -371,19 +373,45 @@ void bootblock_main (void)
 
 	if( dev_t == DEVICE_NPCM730)
 	{
+		UINT32 intcr_tmp = intcr;
+		UINT32 intcr2_tmp = intcr2;
+		UINT32 intcr3_tmp = intcr3;
 		//Boot block performs all of the following anti display act:
 
-		SET_REG_FIELD(INTCR, INTCR_VGAIOEN, 0);
-		SET_REG_FIELD(INTCR, INTCR_DACOFF, 1);
-		SET_REG_FIELD(INTCR, INTCR_LDDRB, 1);
+		SET_VAR_FIELD(intcr_tmp, INTCR_VGAIOEN, 0);
+		SET_VAR_FIELD(intcr_tmp, INTCR_DACOFF, 1);
+		SET_VAR_FIELD(intcr_tmp, INTCR_LDDRB, 1);
 
 		// Enable PCI RC:
-		SET_REG_FIELD(INTCR2, INTCR2_PCIPHYPD, 0);
+		SET_VAR_FIELD(intcr2_tmp, INTCR2_PCIPHYPD, 0);
 
-		SET_REG_FIELD(INTCR3, INTCR3_GFXACCDIS, 1);
+		SET_VAR_FIELD(intcr3_tmp, INTCR3_GFXACCDIS, 1);
+		SET_VAR_FIELD(intcr3_tmp, INTCR3_FIU_FIX, 1);
+
+		REG_WRITE(INTCR, intcr_tmp);
+		REG_WRITE(INTCR2, intcr2_tmp);
+		REG_WRITE(INTCR3, intcr3_tmp);
 
 		REG_WRITE(DACTEST, 0x003FFFFE);
 	}
+	else
+	{
+		SET_REG_FIELD(INTCR3, INTCR3_FIU_FIX, 1);
+	}
+	
+	
+	/*-----------------------------------------------------------------------------------------------------*/
+	/* Fix host stuck issue (version 40.06.08 , 21.11.2017)                                                */
+	/*-----------------------------------------------------------------------------------------------------*/
+	SET_REG_FIELD(INTCR3, INTCR3_GFXRDEN, 1);
+	SET_REG_FIELD(INTCR3, INTCR3_GFXRSTDLY, 0x7);
+	SET_REG_FIELD(INTCR3, INTCR3_GFXRSTDLY, INTCR3_FIU_FIX);
+	serial_printf("\n>set INTCR3_GFXRDEN and INTCR3_GFXRSTDLY\n");
+
+
+	print_reg("INTCR        ", intcr    , REG_READ(INTCR       ));
+	print_reg("INTCR2       ", intcr2   , REG_READ(INTCR2       ));
+	print_reg("INTCR3       ", intcr3   , REG_READ(INTCR3       ));
 
 
 	CLK_Delay_MicroSec(10);
@@ -522,13 +550,6 @@ void bootblock_main (void)
 		CFG_SHM_ReleaseHostWait();
 		serial_printf(KNRM "\n>Host LPC Released (ROM setting)");
 	}
-
-	/*-----------------------------------------------------------------------------------------------------*/
-	/* Fix host stuck issue (version 40.06.08 , 21.11.2017)                                                */
-	/*-----------------------------------------------------------------------------------------------------*/
-	SET_REG_FIELD(INTCR3, INTCR3_GFXRDEN, 1);
-	SET_REG_FIELD(INTCR3, INTCR3_GFXRSTDLY, 0x7);
-	serial_printf("\n>Fix host reset stuck issue (set INTCR3_GFXRDEN and INTCR3_GFXRSTDLY)\n");
 
 
 	/*----------------------------------------------------------------------------------------------------*/

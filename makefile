@@ -245,7 +245,7 @@ $(OUTFILE_Release): $(OUTDIR_Release) $(OBJS_Release)
 	$(LD) -T$(LINKER_FILE) $(LINKER_FLAGS) $(OBJS_Release) -o $(OUTFILE_Release)
 	$(OBJCOPY) $(ONLY_SECTIONS) -O binary $(OUTFILE_Release)  $(subst .elf,.bin,$(OUTFILE_Release))
 	$(OBJCOPY) $(ONLY_SECTIONS) -O verilog $(OUTFILE_Release) $(subst .elf,.dat,$(OUTFILE_Release))
-	#$(OBJDUMP) -d -S $(OUTFILE_Release) >   $(subst .elf,.dat,$(OUTFILE_Release))
+#	$(OBJDUMP) -d -S $(OUTFILE_Release) > $(subst .elf,.asm,$(OUTFILE_Release))
 	#$(OBJDUMP) -t $(OUTFILE_Release) >  $(subst .elf,.dat,$(OUTFILE_Release))
 
 #
