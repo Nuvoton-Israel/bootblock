@@ -1910,12 +1910,14 @@ DEFS_STATUS CLK_Configure_CPU_MC_Clock (UINT32 mcFreq , UINT32 cpuFreq, UINT32 p
 	UINT32 PLLCON1_l = 0;
 	UINT32 PLLCON0_l = 0;
 	UINT32 clksel_l = 0;
+	UINT32 clksel_now_l = 0;
 
 	UINT32 clksel_clkref_l = 0;
 	UINT32 pll0_freq_tmp = 0;
 
 	UINT32 PLLCON0_current_reg_value = 0;
 	UINT32 PLLCON1_current_reg_value = 0;
+
 
 	// If clk already set to this frequency, skip this func ( round down the lowest word):
 	if ((MSW(mcFreq) == MSW(CLK_GetMCFreq())) &&
@@ -2013,40 +2015,37 @@ DEFS_STATUS CLK_Configure_CPU_MC_Clock (UINT32 mcFreq , UINT32 cpuFreq, UINT32 p
 	/* PLL0 handling : Check if PLL is set to the value CPU is set: Notice:even if MC freq == CPU freq,    */
 	/* both will be connected to PLL1, and PLL0 will be turned off.                                 	   */
 	/*-----------------------------------------------------------------------------------------------------*/
-	if (((MSW(CLK_CalculatePLLFrequency(PLLCON0_current_reg_value)) != MSW(cpuFreq)) &&
-	    (cpuFreq != mcFreq))
-
-		// for the case where PLL0 is used for other means then setting CPU0 freq:
-		|| (pll0_freq != 0))
+	if (((MSW(CLK_CalculatePLLFrequency(PLLCON0_current_reg_value)) != MSW(pll0_freq_tmp)) || (cpuFreq != mcFreq)))
 	{
+		clksel_now_l = REG_READ(CLKSEL);
 		/*-----------------------------------------------------------------------------------------------------*/
 		/* Switch clock sources to external clock for all muxes (only for PLL0 users)     	               */
 		/*-----------------------------------------------------------------------------------------------------*/
-		if (READ_VAR_FIELD(clksel_l, CLKSEL_CPUCKSEL) == CLKSEL_CPUCKSEL_PLL0)
+		if (READ_VAR_FIELD(clksel_now_l, CLKSEL_CPUCKSEL) == CLKSEL_CPUCKSEL_PLL0)
 			SET_VAR_FIELD(clksel_clkref_l, CLKSEL_CPUCKSEL,  CLKSEL_CPUCKSEL_CLKREF);
 
-		if (READ_VAR_FIELD(clksel_l, CLKSEL_UARTCKSEL) == CLKSEL_UARTCKSEL_PLL0)
+		if (READ_VAR_FIELD(clksel_now_l, CLKSEL_UARTCKSEL) == CLKSEL_UARTCKSEL_PLL0)
 			SET_VAR_FIELD(clksel_clkref_l, CLKSEL_UARTCKSEL, CLKSEL_UARTCKSEL_CLKREF);
 
-		if (READ_VAR_FIELD(clksel_l, CLKSEL_CLKOUTSEL) == CLKSEL_CLKOUTSEL_PLL0)
+		if (READ_VAR_FIELD(clksel_now_l, CLKSEL_CLKOUTSEL) == CLKSEL_CLKOUTSEL_PLL0)
 			SET_VAR_FIELD(clksel_clkref_l, CLKSEL_CLKOUTSEL, CLKSEL_CLKOUTSEL_CLKREF);
 
-		if (READ_VAR_FIELD(clksel_l, CLKSEL_TIMCKSEL) == CLKSEL_TIMCKSEL_PLL0)
+		if (READ_VAR_FIELD(clksel_now_l, CLKSEL_TIMCKSEL) == CLKSEL_TIMCKSEL_PLL0)
 			SET_VAR_FIELD(clksel_clkref_l, CLKSEL_TIMCKSEL,  CLKSEL_TIMCKSEL_CLKREF);
 
-		if (READ_VAR_FIELD(clksel_l, CLKSEL_SUCKSEL) == CLKSEL_SUCKSEL_PLL0)
+		if (READ_VAR_FIELD(clksel_now_l, CLKSEL_SUCKSEL) == CLKSEL_SUCKSEL_PLL0)
 			SET_VAR_FIELD(clksel_clkref_l, CLKSEL_SUCKSEL,	 CLKSEL_SUCKSEL_CLKREF);
 
-		if (READ_VAR_FIELD(clksel_l, CLKSEL_SDCKSEL) == CLKSEL_SDCKSEL_PLL0)
+		if (READ_VAR_FIELD(clksel_now_l, CLKSEL_SDCKSEL) == CLKSEL_SDCKSEL_PLL0)
 			SET_VAR_FIELD(clksel_clkref_l, CLKSEL_SDCKSEL,	 CLKSEL_SDCKSEL_CLKREF);
 
-		if (READ_VAR_FIELD(clksel_l, CLKSEL_GFXCKSEL) == CLKSEL_GFXCKSEL_PLL0)
+		if (READ_VAR_FIELD(clksel_now_l, CLKSEL_GFXCKSEL) == CLKSEL_GFXCKSEL_PLL0)
 			SET_VAR_FIELD(clksel_clkref_l, CLKSEL_GFXCKSEL,  CLKSEL_GFXCKSEL_CLKREF);
 
 		if (pll0_freq != 0)
 		{
 			SET_VAR_FIELD(clksel_l, CLKSEL_CPUCKSEL,  CLKSEL_CPUCKSEL_PLL1);
-			SET_VAR_FIELD(clksel_l, CLKSEL_UARTCKSEL, CLKSEL_UARTCKSEL_PLL1);
+			SET_VAR_FIELD(clksel_l, CLKSEL_UARTCKSEL, CLKSEL_UARTCKSEL_PLL2);
 			SET_VAR_FIELD(clksel_l, CLKSEL_CLKOUTSEL, CLKSEL_CLKOUTSEL_PLL0); // TOCK comes from PLL0 !
 			SET_VAR_FIELD(clksel_l, CLKSEL_TIMCKSEL,  CLKSEL_TIMCKSEL_CLKREF);
 			SET_VAR_FIELD(clksel_l, CLKSEL_SUCKSEL,	 CLKSEL_SUCKSEL_PLL2);
@@ -2099,19 +2098,21 @@ DEFS_STATUS CLK_Configure_CPU_MC_Clock (UINT32 mcFreq , UINT32 cpuFreq, UINT32 p
 	/*-----------------------------------------------------------------------------------------------------*/
 	if (MSW(mcFreq) != MSW(CLK_GetMCFreq()))
 	{
+		clksel_l           = REG_READ(CLKSEL);
+		clksel_clkref_l    = clksel_l;
+		clksel_now_l       = REG_READ(CLKSEL);
+
 		/*-----------------------------------------------------------------------------------------------------*/
 		/* if both freq are same, move everything to PLL1 and shutdown PLL0: Notice clksel_l is used for final value for CLKSEL reg !*/
 		/*-----------------------------------------------------------------------------------------------------*/
 		if ((mcFreq == cpuFreq)|| (pll0_freq != 0))
 		{
-			clksel_clkref_l = clksel_l;
-
 			/*-----------------------------------------------------------------------------------------------------*/
 			/* MC and CPU use same PLL1                                                                            */
 			/*-----------------------------------------------------------------------------------------------------*/
 			SET_VAR_FIELD(clksel_l, CLKSEL_CPUCKSEL,  CLKSEL_CPUCKSEL_PLL1);
 			SET_VAR_FIELD(clksel_l, CLKSEL_MCCKSEL,   CLKSEL_MCCKSEL_PLL1);
-			SET_VAR_FIELD(clksel_l, CLKSEL_UARTCKSEL, CLKSEL_UARTCKSEL_PLL1);
+			SET_VAR_FIELD(clksel_l, CLKSEL_UARTCKSEL, CLKSEL_UARTCKSEL_PLL2);
 			SET_VAR_FIELD(clksel_l, CLKSEL_CLKOUTSEL, CLKSEL_CLKOUTSEL_PLL1);
 			SET_VAR_FIELD(clksel_l, CLKSEL_TIMCKSEL,  CLKSEL_TIMCKSEL_CLKREF);
 			SET_VAR_FIELD(clksel_l, CLKSEL_SUCKSEL,   CLKSEL_SUCKSEL_PLL2);
@@ -2132,23 +2133,26 @@ DEFS_STATUS CLK_Configure_CPU_MC_Clock (UINT32 mcFreq , UINT32 cpuFreq, UINT32 p
 		/*-----------------------------------------------------------------------------------------------------*/
 
 
-		if (READ_VAR_FIELD(clksel_l, CLKSEL_UARTCKSEL) == CLKSEL_UARTCKSEL_PLL1)
+		if (READ_VAR_FIELD(clksel_now_l, CLKSEL_UARTCKSEL) == CLKSEL_UARTCKSEL_PLL1)
 			SET_VAR_FIELD(clksel_clkref_l, CLKSEL_UARTCKSEL, CLKSEL_UARTCKSEL_CLKREF);
 
-		if (READ_VAR_FIELD(clksel_l, CLKSEL_CLKOUTSEL) == CLKSEL_CLKOUTSEL_PLL1)
+		if (READ_VAR_FIELD(clksel_now_l, CLKSEL_CLKOUTSEL) == CLKSEL_CLKOUTSEL_PLL1)
 			SET_VAR_FIELD(clksel_clkref_l, CLKSEL_CLKOUTSEL, CLKSEL_CLKOUTSEL_CLKREF);
 
-		if (READ_VAR_FIELD(clksel_l, CLKSEL_TIMCKSEL) == CLKSEL_TIMCKSEL_PLL1)
+		if (READ_VAR_FIELD(clksel_now_l, CLKSEL_TIMCKSEL) == CLKSEL_TIMCKSEL_PLL1)
 			SET_VAR_FIELD(clksel_clkref_l, CLKSEL_TIMCKSEL,  CLKSEL_TIMCKSEL_CLKREF);
 
-		if (READ_VAR_FIELD(clksel_l, CLKSEL_SUCKSEL) == CLKSEL_SUCKSEL_PLL1)
+		if (READ_VAR_FIELD(clksel_now_l, CLKSEL_SUCKSEL) == CLKSEL_SUCKSEL_PLL1)
 			SET_VAR_FIELD(clksel_clkref_l, CLKSEL_SUCKSEL,   CLKSEL_SUCKSEL_CLKREF);
 
-		if (READ_VAR_FIELD(clksel_l, CLKSEL_SDCKSEL) == CLKSEL_SDCKSEL_PLL1)
+		if (READ_VAR_FIELD(clksel_now_l, CLKSEL_SDCKSEL) == CLKSEL_SDCKSEL_PLL1)
 			SET_VAR_FIELD(clksel_clkref_l, CLKSEL_SDCKSEL,   CLKSEL_SDCKSEL_CLKREF);
 
-		if (READ_VAR_FIELD(clksel_l, CLKSEL_GFXCKSEL) == CLKSEL_GFXCKSEL_PLL1)
+		if (READ_VAR_FIELD(clksel_now_l, CLKSEL_GFXCKSEL) == CLKSEL_GFXCKSEL_PLL1)
 			SET_VAR_FIELD(clksel_clkref_l, CLKSEL_GFXCKSEL,  CLKSEL_GFXCKSEL_CLKREF);
+
+		if (READ_VAR_FIELD(clksel_now_l, CLKSEL_CPUCKSEL) == CLKSEL_CPUCKSEL_PLL1)
+			SET_VAR_FIELD(clksel_clkref_l, CLKSEL_CPUCKSEL,  CLKSEL_CPUCKSEL_CLKREF);
 
 
 		/*-----------------------------------------------------------------------------------------------------*/
@@ -2177,7 +2181,7 @@ DEFS_STATUS CLK_Configure_CPU_MC_Clock (UINT32 mcFreq , UINT32 cpuFreq, UINT32 p
 		REG_WRITE(CLKSEL, clksel_l);
 		CLK_Delay_MicroSec(60);
 
-		if (mcFreq == cpuFreq)
+		if ((mcFreq == cpuFreq) && (pll0_freq == 0))
 		{
 			// shutdown PLL0, not used any more:
 			SET_VAR_FIELD(PLLCON0_l, PLLCONn_PWDEN, PLLCONn_PWDEN_POWER_DOWN);

@@ -398,8 +398,8 @@ void bootblock_main (void)
 	{
 		SET_REG_FIELD(INTCR3, INTCR3_FIU_FIX, 1);
 	}
-	
-	
+
+
 	/*-----------------------------------------------------------------------------------------------------*/
 	/* Fix host stuck issue (version 40.06.08 , 21.11.2017)                                                */
 	/*-----------------------------------------------------------------------------------------------------*/
@@ -505,13 +505,16 @@ void bootblock_main (void)
 	/*--------------------------------------------------------------------*/
 	if (eHostIf == HOST_IF_ESPI)
 	{
-		serial_printf(KYEL "\n>HOST IF: ESPI");
-		GPIO_Init(162,  GPIO_DIR_INPUT, GPIO_PULL_NONE, GPIO_OTYPE_OPEN_DRAIN, FALSE); // SERIRQ_N
-		CHIP_MuxESPI(24); // 24mA
-	 	ESPI_ConfigAutoHandshake(0x0001111F);
-		ESPI_Config(ESPI_IO_MODE_SINGLE_DUAL_QUAD, ESPI_MAX_33_MHz, ESPI_RST_OUT_LOW);
-	 	SHM_ReleaseHostWait();
-	 	serial_printf(KNRM "\n>Host ESPI Released");
+		if (CFG_GetResetNum() == 0)
+		{
+			serial_printf(KYEL "\n>HOST IF: ESPI");
+			GPIO_Init(162,  GPIO_DIR_INPUT, GPIO_PULL_NONE, GPIO_OTYPE_OPEN_DRAIN, FALSE); // SERIRQ_N
+			CHIP_MuxESPI(24); // 24mA
+		 	ESPI_ConfigAutoHandshake(0x0001111F);
+			ESPI_Config(ESPI_IO_MODE_SINGLE_DUAL_QUAD, ESPI_MAX_33_MHz, ESPI_RST_OUT_LOW);
+		 	SHM_ReleaseHostWait();
+		 	serial_printf(KNRM "\n>Host ESPI Released");
+	 	}
 	}
 	else if (eHostIf == HOST_IF_LPC)
 	{
