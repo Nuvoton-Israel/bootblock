@@ -166,6 +166,10 @@ void HAL_PrintRegs (void)
     MIWU_PrintRegs();
 #endif
 
+#if defined MPU_MODULE_TYPE
+    MPU_PrintRegs();
+#endif
+
 #if defined MRC_MODULE_TYPE
     MRC_PrintRegs();
 #endif
@@ -448,6 +452,10 @@ void HAL_PrintVersions (void)
 
 #if defined MIWU_MODULE_TYPE
     MIWU_PrintVersion();
+#endif
+
+#if defined MPU_MODULE_TYPE
+    MPU_PrintVersion();
 #endif
 
 #if defined MRC_MODULE_TYPE

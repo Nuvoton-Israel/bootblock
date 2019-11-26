@@ -3131,7 +3131,7 @@ static DEFS_STATUS Sweep_Input_DSQ_Enhanced_Training_l(void)
         // We can't start with 0 since DQS_IP value is used as base value for DQn that are negative value. (e.g., delay <0..63> = DQS_IP + DQn)
         // In addition we want an option to sweep DQn easily with negative values and reach window edge.
         l_Start_DQS = l_dll_half_dly;      // alternative use 0x18 that is good for 667MHz and 800MHz
-        l_End_DQS = MIN(0x3F - l_dll_half_dly, l_Start_DQS + l_dll_half_dly); // alternative use 0x2C that is good for 667MHz and 800MHz
+        l_End_DQS = MIN(0x3F - l_dll_half_dly, l_Start_DQS + l_dll_half_dly - 4); // alternative use 0x2C that is good for 667MHz and 800MHz
 
 
 	serial_printf("Enhanced sweep input DQS delay using read leveling for best eye size, from 0x%x to 0x%x (1 cycle delay elements:%d, 1/4 cycle:%d)\n",
@@ -3140,7 +3140,7 @@ static DEFS_STATUS Sweep_Input_DSQ_Enhanced_Training_l(void)
 	/*---------------------------------------------------------------------------------------------*/
 	/* Sweep input DQS delay against window size            		                	*/
 	/*---------------------------------------------------------------------------------------------*/
-	for (l_DQS = l_Start_DQS; l_DQS < l_End_DQS ; l_DQS++)
+	for (l_DQS = l_Start_DQS; l_DQS <= l_End_DQS ; l_DQS++)
 	{
 
 		serial_printf("Set 0x%x to in DQS and out DQS (all lanes)\n", l_DQS);
@@ -3203,6 +3203,8 @@ static DEFS_STATUS Sweep_Input_DSQ_Enhanced_Training_l(void)
 							ilane, l_DQS, l_DQS, l_clk_dly);
 						l_good_DQS[ilane] = l_DQS;
 						SET_VAR_BIT(l_done, ilane);
+						l_End_DQS = MAX(l_End_DQS, l_DQS + 3);
+						serial_printf("> Lane%d: Sweep DQS until 0x%02X\n", ilane, l_End_DQS);
 					}
 
 					l_prev_clk_dly[ilane] = l_clk_dly;
@@ -3228,22 +3230,39 @@ static DEFS_STATUS Sweep_Input_DSQ_Enhanced_Training_l(void)
 	}
 
 
+	for (ilane = laneStart; ilane < laneStop; ilane++)
+	{
+		if (READ_VAR_BIT(l_done, ilane) == 0)
+		{
+			if (l_good_DQS[ilane] == 0)
+			{
+				serial_printf(KYEL "> Lane %u: Use the default value for IP_DQS and OP_DQS: 0x%X \n" KNRM, ilane, 0x1F);
+				l_good_DQS[ilane] = 0x1F;
+			}
+			else
+			{
+				l_good_DQS[ilane] += 2;
+				serial_printf(KYEL "> Lane %u: Use the first good value for IP_DQS and OP_DQS: 0x%X \n" KNRM, ilane, l_good_DQS[ilane]); // +2 to get far for a marine value (maybe)
+			}
+		}
+		else
+		{
+			l_good_DQS[ilane] += 2;
+			serial_printf (KYEL "> Lane %u: Set IP_DQS and OP_DQS: 0x%02X \n" KNRM, ilane, l_good_DQS[ilane]); // +2 to get far for marine value (maybe)
+		}
+	}
+
+
 	/*---------------------------------------------------------------------------------------------*/
-	/* Init DQS input delay to selected value + 1 : leave a gap from "shen masor"			*/
+	/* Init DQS input delay to selected value, leave a gap from "shen masor"	        	*/
 	/*---------------------------------------------------------------------------------------------*/
 	for (ilane = laneStart; ilane < laneStop; ilane++)
 	{
-		serial_printf(KGRN "Enhanced results lane%d: Set final value in and out DQS delay 0x%x\n" KNRM, ilane, l_good_DQS[ilane] + 1);
-		Set_DQS_in_val(ilane, l_good_DQS[ilane] + 1,  FALSE);
-		Set_DQS_out_val(ilane, l_good_DQS[ilane] + 1, FALSE);
+		serial_printf(KGRN "Enhanced results lane%d: Set final value in and out DQS delay 0x%x\n" KNRM, ilane, l_good_DQS[ilane]);
+		Set_DQS_in_val(ilane, l_good_DQS[ilane],  FALSE);
+		Set_DQS_out_val(ilane, l_good_DQS[ilane], FALSE);
 
 	}
-
-	//serial_printf(KGRN "For tests: ignore enhanced on ECC lane\n" KNRM);
-
-
-	//Set_DQS_in_val(2, 0x1F, TRUE);
-	//Set_DQS_out_val(2, 0x1F, TRUE);
 
 	// dummy accsess to DDR
 	IOW32 (0x1000, IOR32(0x1000));
