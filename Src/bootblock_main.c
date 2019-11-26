@@ -405,7 +405,6 @@ void bootblock_main (void)
 	/*-----------------------------------------------------------------------------------------------------*/
 	SET_REG_FIELD(INTCR3, INTCR3_GFXRDEN, 1);
 	SET_REG_FIELD(INTCR3, INTCR3_GFXRSTDLY, 0x7);
-	SET_REG_FIELD(INTCR3, INTCR3_GFXRSTDLY, INTCR3_FIU_FIX);
 	serial_printf("\n>set INTCR3_GFXRDEN and INTCR3_GFXRSTDLY\n");
 
 
