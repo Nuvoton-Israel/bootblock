@@ -2299,20 +2299,17 @@ DEFS_STATUS CLK_Verify_and_update_dividers (void)
 
 
 	/*-----------------------------------------------------------------------------------------------------*/
-	/* Fix SPI0,3 to be above 40MHz and below 50Mhz                                                        */
+	/* Fix SPI0,3 to be  below 50Mhz                                                                       */
 	/*-----------------------------------------------------------------------------------------------------*/
-	clkDiv = (clk4Freq / (40 *_1MHz_) );
-	SET_REG_FIELD(CLKDIV3, CLKDIV3_SPI0CKDV, CLKDIV3_SPI0CKDV_DIV(clkDiv));
+	clkDiv = READ_REG_FIELD(CLKDIV3, CLKDIV3_SPI0CKDV) + 1;
 
-	if (CLK_GetAPBFreq(SPI0) <= (40 * _1MHz_))
-		clkDiv--;
 	if (CLK_GetAPBFreq(SPI0) > (51 * _1MHz_))
+	{
 		clkDiv++;
-
-
-	SET_REG_FIELD(CLKDIV3, CLKDIV3_SPI0CKDV, CLKDIV3_SPI0CKDV_DIV(clkDiv));
-	SET_REG_FIELD(CLKDIV3, CLKDIV3_SPIXCKDV, CLKDIV3_SPIXCKDV_DIV(clkDiv));
-	SET_REG_FIELD(CLKDIV1, CLKDIV1_AHB3CKDIV, CLKDIV1_AHB3CK_DIV(clkDiv));
+		SET_REG_FIELD(CLKDIV3, CLKDIV3_SPI0CKDV, CLKDIV3_SPI0CKDV_DIV(clkDiv));
+		SET_REG_FIELD(CLKDIV3, CLKDIV3_SPIXCKDV, CLKDIV3_SPIXCKDV_DIV(clkDiv));
+		SET_REG_FIELD(CLKDIV1, CLKDIV1_AHB3CKDIV, CLKDIV1_AHB3CK_DIV(clkDiv));
+	}
 
 	CLK_ConfigurePCIClock();
 	CLK_ConfigureADCClock(25 * _1MHz_);
