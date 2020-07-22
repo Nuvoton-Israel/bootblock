@@ -99,14 +99,6 @@ to flash via the IGPS (https://github.com/Nuvoton-Israel/igps) or other means.
 ==================
 - Reset BB mailbox status before use (before boot starts it still show the status from last reset (not related to PORST). 
 
-## Bootblock 10.10.01 
-==================
-- Write 0xFF on the public key to be invalidated. (Key will show CRC error).
-- Add WD num field and WD stay on to header.
-- GPIO toggle while copy flash. GPIO value selected on header. 
-- Bug fix: Add key number to the log. Print more info (update, recovery and halt).
-- Print key status in text, not value. For readability.
-
 ## Bootblock 10.10.00 
 ==================
 - Re-arrange header fields. See BootBlock user guide for details.
