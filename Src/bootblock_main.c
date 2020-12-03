@@ -73,7 +73,6 @@ void           (*BOOTBLOCK_Init_Before_Image_Check_Vendor) (void);
 void           (*BOOTBLOCK_Init_Before_UBOOT_Vendor) (void);
 void           (*BOOTBLOCK_Init_GPIO_Vendor) (void);
 
-
 #ifdef _UNIT_TEST_
 // for tests:
 #include "bootblock_unit_test.c"
@@ -123,6 +122,7 @@ void bootblock_main (void)
 #endif
 	UINT32			bootblockVersion = bb_version.BootblockVersion;
 	char reset[6];
+	MC_INIT_VALUES mc_init_s;
 
 	Tick();
 
@@ -401,7 +401,7 @@ void bootblock_main (void)
 
 
 	/*-----------------------------------------------------------------------------------------------------*/
-	/* Fix host stuck issue (version 40.06.08 , 21.11.2017)                                                */
+	/* Fix host stuck issue                                                                                */
 	/*-----------------------------------------------------------------------------------------------------*/
 	SET_REG_FIELD(INTCR3, INTCR3_GFXRDEN, 1);
 	SET_REG_FIELD(INTCR3, INTCR3_GFXRSTDLY, 0x7);
@@ -607,10 +607,12 @@ void bootblock_main (void)
 
 	}
 
+
 	/*-------------------------------------------------------------------------------------------------*/
 	/* Memory Controller Init                                                                          */
 	/*-------------------------------------------------------------------------------------------------*/
-	status = MC_ConfigureDDR(BOOTBLOCK_Get_MC_config());
+	BOOTBLOCK_Get_MC_Init_val(&mc_init_s);
+	status = MC_ConfigureDDR(BOOTBLOCK_Get_MC_config(), &mc_init_s);
 
 	/*-------------------------------------------------------------------------------------------------*/
 	/* If secondary reset MC init skipped. And this is OK.                                             */

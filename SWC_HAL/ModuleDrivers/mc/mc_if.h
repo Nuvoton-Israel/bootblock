@@ -23,7 +23,14 @@
 /*---------------------------------------------------------------------------------------------------------*/
 #include "hal.h"
 
+typedef struct MC_INIT_VALUES_tag
+{
+	UINT32 DQS_input;
+	UINT32 DQS_output;
+	UINT8  DQS_start_enh_sweep;       // 0x16C
+	UINT8  DQS_end_enh_sweep;         // 0x16D
 
+} MC_INIT_VALUES;
 
 
 /*---------------------------------------------------------------------------------------------------------*/
@@ -36,9 +43,6 @@ typedef enum
     MC_PRIO_LOW,
 } MC_PRIO_T;
 
-
-
-
 /*---------------------------------------------------------------------------------------------------------*/
 /* Function:        MC_ConfigureDDR                                                                        */
 /*                                                                                                         */
@@ -48,7 +52,7 @@ typedef enum
 /* Description:                                                                                            */
 /*                  Set default configuration for the DDR Memory Controller                                */
 /*---------------------------------------------------------------------------------------------------------*/
-DEFS_STATUS MC_ConfigureDDR (UINT8 mc_config);
+DEFS_STATUS MC_ConfigureDDR (UINT8 mc_config, MC_INIT_VALUES *init);
 
 
 /*---------------------------------------------------------------------------------------------------------*/

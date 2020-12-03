@@ -525,6 +525,7 @@ DEFS_STATUS       BOOTBLOCK_ReadHeaderParameter (HEADER_FIELD_T field, UINT8 * r
 {
 	UINT32            image = 0;
 
+
 	/*--------------------------------------------------------------------------------------------------*/
 	/* Get current loaded image number (if not provided by the caller function)                         */
 	/*--------------------------------------------------------------------------------------------------*/
@@ -652,6 +653,12 @@ DEFS_STATUS       BOOTBLOCK_ReadHeaderParameter (HEADER_FIELD_T field, UINT8 * r
 			break;
 		}
 
+		case HEADER_FIELD_MC_INIT:
+		{
+			memcpy(retVal, &bootBlockHeader->header.DQS_input   , sizeof (MC_INIT_VALUES));
+			break;
+		}
+
 		case HEADER_FIELD_DESTADDR:
 		{
 		    memcpy(retVal, &bootBlockHeader->header.destAddr   , sizeof (bootBlockHeader->header.destAddr    ));
@@ -709,6 +716,24 @@ UINT8       BOOTBLOCK_Get_MC_config (void)
 	BOOTBLOCK_ReadHeaderParameter(HEADER_FIELD_MC_CONFIG, &val, NULL);
 
 	return val;
+}
+
+
+/*---------------------------------------------------------------------------------------------------------*/
+/* Function:        BOOTBLOCK_Get_MC_Init_val                                                              */
+/*                                                                                                         */
+/* Parameters:                                                                                             */
+/*                  mc_init_s -                                                                            */
+/*                                                                                                         */
+/* Returns:         none                                                                                   */
+/* Side effects:                                                                                           */
+/* Description:                                                                                            */
+/*                  Read MC init parameters from header                                                    */
+/*---------------------------------------------------------------------------------------------------------*/
+void           BOOTBLOCK_Get_MC_Init_val (MC_INIT_VALUES *mc_init_s)
+{
+	BOOTBLOCK_ReadHeaderParameter(HEADER_FIELD_MC_INIT, (UINT8*)mc_init_s, NULL);
+	return;
 }
 
 

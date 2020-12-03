@@ -70,7 +70,14 @@ typedef union BOOT_HEADER_tag
 		UINT8   host_if;                       // 0x157       1
 
 		UINT32  fiu0_dwr_cfg_set;              // 0x158       4           Word contents copied by BB code to FIU0 FIU_DWR_CFG register1   Yes     No
-	        UINT8   reservedSigned[0xA4];          // 0x15C    164         Reserved for future use
+
+
+		UINT8   reservedSigned1[0x8];          // 0x15C    8         Reserved for future use
+		UINT32  DQS_input;                     // 0x164
+		UINT32  DQS_output;                    // 0x168
+		UINT8   DQS_start_enh_sweep;           // 0x16C
+		UINT8   DQS_end_enh_sweep;             // 0x16D
+		UINT8   reservedSigned2[0x92];         // 0x16E       0x73         Reserved for future use
 	} header ;
 
 	UINT8    bytes[512];
@@ -182,7 +189,9 @@ typedef enum     HEADER_FIELD_T
 	HEADER_FIELD_REVOKE_KEYS=37,
 	HEADER_FIELD_GPIO_HEARTBEAT=38,
 	HEADER_FIELD_WD_NUM=39,
-	HEADER_FIELD_WD_STAY_ON=40
+	HEADER_FIELD_WD_STAY_ON=40,
+	HEADER_FIELD_MC_INIT=0x41,
+
 } HEADER_FIELD_T;
 
 typedef struct {
@@ -213,6 +222,7 @@ UINT32         BOOTBLOCK_Get_MC_freq (void);
 UINT32         BOOTBLOCK_Get_CPU_freq (void);
 UINT8          BOOTBLOCK_Get_MC_config (void);
 HOST_IF_T      BOOTBLOCK_Get_host_if (void);
+void           BOOTBLOCK_Get_MC_Init_val (MC_INIT_VALUES *mc_init_s);
 
 
 /*---------------------------------------------------------------------------------------------------------*/
