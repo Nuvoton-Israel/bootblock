@@ -6,7 +6,7 @@
  NPCM7XX (Poleg) BootBlock Release Letter 
 ----------------------------------------------------------------------
 
-# NPCM7XX bootBlock Package
+# NPCM7XX BootBlock Package
 Release Letter
 Version: 10.10.16
 Date:    Nov 2020
@@ -53,8 +53,8 @@ to flash via the IGPS (https://github.com/Nuvoton-Israel/igps) or other means.
 
 # ENHANCEMENTS
 ----------------
-Bootblock 10.10.16     Date: 11.11.20
-==================     ===============
+Bootblock 10.10.16
+==================
 - MC: add option to change enhanced training range.
 - MC: Change default enhanced training range to [0x14:0x28].
 - MC: minimum DQS eye is 30.
@@ -74,14 +74,14 @@ Bootblock 10.10.16     Date: 11.11.20
 
 # HISTORY
 -------------------
+Bootblock 10.10.12
+==================
+- SPI0 frequency is now only limited to be up to 50MHz (remove 40MHz lower limit).
+  This check is only performed if PLLs are changes (RUN_BMC or new header frequency values).
+  
 Bootblock 10.10.11
 ==================
 - Fix an issue in INTCR3 settings (FIU_FIX field).
-
-Bootblock 10.10.12     Date: 21.07.20
-==================     ===============
-- SPI0 frequency is now only limited to be up to 50MHz (remove 40MHz lower limit).
-  This check is only performed if PLLs are changes (RUN_BMC or new header frequency values).
 
 Bootblock 10.10.10
 ==================
