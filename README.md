@@ -55,12 +55,7 @@ to flash via the IGPS (https://github.com/Nuvoton-Israel/igps) or other means.
 ----------------
 Bootblock 10.10.16
 ==================
-- MC: add option to change enhanced training range.
-- MC: Change default enhanced training range to [0x14:0x28].
-- MC: minimum DQS eye is 30.
-- MC: in enhanced training sweep only in DQS, not out DQS.
-- MC: add option to override DQS in and out init values from header.
-- MC: when find a step in enhanced training, take +4 (was +2)
+- MC: Enhanced training optimization.
 
 # FIXED ISSUES
 ------------
