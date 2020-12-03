@@ -74,8 +74,8 @@ Bootblock 10.10.16     Date: 11.11.20
 
 # HISTORY
 -------------------
-Bootblock 10.10.11     Date: 26.11.19 
-==================     ===============
+Bootblock 10.10.11
+==================
 - Fix an issue in INTCR3 settings (FIU_FIX field).
 
 Bootblock 10.10.12     Date: 21.07.20
@@ -83,12 +83,12 @@ Bootblock 10.10.12     Date: 21.07.20
 - SPI0 frequency is now only limited to be up to 50MHz (remove 40MHz lower limit).
   This check is only performed if PLLs are changes (RUN_BMC or new header frequency values).
 
-Bootblock 10.10.10     Date: 17.11.19 
-==================     ===============
+Bootblock 10.10.10
+==================
 - MC: in enhanced training: change the sweep range accrording to the location of the step. (run time optimization)
 
-Bootblock 10.10.09     Date: 27.10.19 
-==================     ===============
+Bootblock 10.10.09
+==================
 - CLK: fix an issue when setting MC and CPU clocks to different values (using the header).
 - eSPI: init only on PORST. 
 
