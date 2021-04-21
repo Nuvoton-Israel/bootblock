@@ -173,37 +173,37 @@ void CFG_PrintResetType (char *str, BOOLEAN bPrint)
 		val = ~val;
 	}
 
-	if ( READ_VAR_FIELD(val, RESSR_CORST) == 1 )
-		memcpy(str, "CORST ", 6);
-
-	if ( READ_VAR_FIELD(val, RESSR_PORST) == 1 )
-		memcpy(str, "PORST ", 6);
-
-	if ( READ_VAR_FIELD(val, RESSR_WD0RST) == 1 )
-		memcpy(str, "WD0   ", 6);
-
-	if ( READ_VAR_FIELD(val, RESSR_WD1RST) == 1 )
-		memcpy(str, "WD1   ", 6);
-
-	if ( READ_VAR_FIELD(val, RESSR_WD2RST) == 1 )
-		memcpy(str, "WD2   ", 6);
-
-	if ( READ_VAR_FIELD(val, RESSR_SWRST1) == 1 )
-		memcpy(str, "SW1   ", 6);
-
-	if ( READ_VAR_FIELD(val, RESSR_SWRST2) == 1 )
-		memcpy(str, "SW2   ", 6);
-
-	if ( READ_VAR_FIELD(val, RESSR_SWRST3) == 1 )
-		memcpy(str, "SW3   ", 6);
-
-	if ( READ_VAR_FIELD(val, RESSR_SWRST4) == 1 )
-		memcpy(str, "SW4   ", 6);
-
-
 	if (bPrint == TRUE)
-		serial_printf(">Last reset was %s\n", str);
+	{
+		serial_printf(">Last reset was ");
 
+		if ( READ_VAR_FIELD(val, RESSR_CORST) == 1 )
+			serial_printf("CORST\n");
+
+		if ( READ_VAR_FIELD(val, RESSR_PORST) == 1 )
+			serial_printf("PORST\n");
+
+		if ( READ_VAR_FIELD(val, RESSR_WD0RST) == 1 )
+			serial_printf("WD0\n");
+
+		if ( READ_VAR_FIELD(val, RESSR_WD1RST) == 1 )
+			serial_printf("WD1\n");
+
+		if ( READ_VAR_FIELD(val, RESSR_WD2RST) == 1 )
+			serial_printf("WD2\n");
+
+		if ( READ_VAR_FIELD(val, RESSR_SWRST1) == 1 )
+			serial_printf("SW1\n");
+
+		if ( READ_VAR_FIELD(val,  RESSR_SWRST2) == 1 )
+			serial_printf("SW2\n");
+
+		if ( READ_VAR_FIELD(val, RESSR_SWRST3) == 1 )
+			serial_printf("SW3\n");
+
+		if ( READ_VAR_FIELD(val, RESSR_SWRST4) == 1 )
+			serial_printf("SW4\n");
+	}
 	return;
 
 }

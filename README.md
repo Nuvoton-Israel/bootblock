@@ -1,6 +1,6 @@
 ----------------------------------------------------------------------
  SPDX-License-Identifier: GPL-2.0                                     
- Copyright (c) 2010-2020 by Nuvoton Technology Corporation   
+ Copyright (c) 2010-2021 by Nuvoton Technology Corporation   
  All rights reserved       
 
  NPCM7XX (Poleg) BootBlock Release Letter 
@@ -8,8 +8,8 @@
 
 # NPCM7XX BootBlock Package
 Release Letter
-Version: 10.10.16
-Date:    Nov 2020
+Version: 10.10.17
+Date:    Apr 2021
 
 
 # PACKAGE CONTENTS
@@ -53,9 +53,11 @@ to flash via the IGPS (https://github.com/Nuvoton-Israel/igps) or other means.
 
 # ENHANCEMENTS
 ----------------
-Bootblock 10.10.16
+Bootblock 10.10.17
 ==================
-- MC: Enhanced training optimization.
+- Add retries to DDR training.
+- Disable MC ECC interrupts.
+- Add memory tests at the end of the DDR training.
 
 # FIXED ISSUES
 ------------
@@ -69,6 +71,10 @@ Bootblock 10.10.16
 
 # HISTORY
 -------------------
+Bootblock 10.10.16
+==================
+- MC: Enhanced training optimization.
+
 Bootblock 10.10.12
 ==================
 - SPI0 frequency is now only limited to be up to 50MHz (remove 40MHz lower limit).

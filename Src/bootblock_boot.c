@@ -32,6 +32,10 @@
 
 #define WTCR_655_MICRO_COUNTER  (BUILD_FIELD_VAL(WTCR_WTR, 1)|BUILD_FIELD_VAL(WTCR_WTRE, 1)|BUILD_FIELD_VAL(WTCR_WTE, 1)) // 0x83
 
+
+extern void asm_jump_to_address(UINT32 address);
+
+
 /*---------------------------------------------------------------------------------------------------------*/
 /* Boot module local functions                                                                          */
 /*---------------------------------------------------------------------------------------------------------*/
@@ -235,7 +239,7 @@ DEFS_STATUS      BOOTBLOCK_CheckImageCopyAndJump (BOOT_HEADER_T *uBootHeader, BO
 			    		print_errors++;
 			    	}
 			    }
-			    serial_printf("\n>Number of erroneous dwords %d\n", print_errors);
+			    serial_printf("\n>Number of erroneous dwords %d\nPerform mem test:\n", print_errors);
 
 
 				ber = MC_MemStressTest(FALSE, FALSE);
@@ -246,6 +250,12 @@ DEFS_STATUS      BOOTBLOCK_CheckImageCopyAndJump (BOOT_HEADER_T *uBootHeader, BO
 
 				if(repeat == 1){
 					serial_printf("\n>   Halt\n\n");
+
+					// retry the whole bootblock.
+					SET_REG_FIELD(INTCR2, INTCR2_MC_INIT, 0);
+
+					asm_jump_to_address(RAM2_BASE_ADDR + sizeof(BOOT_HEADER_T));
+
 		        		while(1);
 		        	}
 		        }

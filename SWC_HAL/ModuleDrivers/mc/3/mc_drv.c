@@ -2232,13 +2232,16 @@ static DEFS_STATUS Sweep_DQs_Trim_l (BOOLEAN bInput)
 
 
 /*---------------------------------------------------------------------------------------------------------*/
-/* Function:		MC_MemStressTest									   */
-/*													   */
-/* Parameters:		bECC : if true, mem test is for ECC lane. Can't sweep it directly, must check ber bit  */
-/* Returns:		bitwise error in UINT16 (one UINT8 for each lane)					   */
-/* Side effects:											   */
-/* Description:												   */
-/*			This routine does memory test with a list of patterns. Used for sweep.		   */
+/* Function:        MC_MemStressTest                                                                       */
+/*                                                                                                         */
+/* Parameters:                                                                                             */
+/*                  bECC - if true, mem test is for ECC lane. Can't sweep it directly, must check ber bit  */
+/*                  bQuick - Perform only fixes pattern test                                               */
+/*                                                                                                         */
+/* Returns:         bitwise error in UINT16 (one UINT8 for each lane)                                      */
+/* Side effects:                                                                                           */
+/* Description:                                                                                            */
+/*                  This routine does memory test with a list of patterns. Used for sweep.                 */
 /*---------------------------------------------------------------------------------------------------------*/
 UINT16 MC_MemStressTest (BOOLEAN bECC, BOOLEAN bQuick )
 {
@@ -2262,7 +2265,7 @@ UINT16 MC_MemStressTest (BOOLEAN bECC, BOOLEAN bQuick )
 	volatile UINT32   *dstAddrStartLong = (UINT32 *)0x1000;
 
 	/*-----------------------------------------------------------------------------------------------------*/
-	/*                    Fixed pattern test                           */
+	/*                    Fixed pattern test                                                               */
 	/*-----------------------------------------------------------------------------------------------------*/
 	for (iCnt1 = 0; iCnt1 < ARRAY_SIZE(aPtrn); iCnt1++)
 	{
@@ -2271,7 +2274,7 @@ UINT16 MC_MemStressTest (BOOLEAN bECC, BOOLEAN bQuick )
 		IOW32(MC_BASE_ADDR + 4*INT_ACK_ADDR, 0x7ffffff);
 		IOW32(MC_BASE_ADDR + 4*INT_ACK_ADDR, 0x0);
 		/*-----------------------------------------------------------------------------------------------------*/
-		/*  Write pattern                                              */
+		/*  Write pattern                                                                                      */
 		/*-----------------------------------------------------------------------------------------------------*/
 		// memset((void *)dstAddrStart, (UINT8)aPtrn[iCnt1], iPtrnSize);
 		for( iCnt2 = 0; iCnt2 <  iPtrnSize ; iCnt2 += 4)
@@ -2285,7 +2288,7 @@ UINT16 MC_MemStressTest (BOOLEAN bECC, BOOLEAN bQuick )
 		dstAddrStart = (UINT16 *)0x1000;
 		dstAddrStartLong = (UINT32 *)0x1000;
 		/*-----------------------------------------------------------------------------------------------------*/
-		/* Verify pattern                                              */
+		/* Verify pattern                                                                                      */
 		/*-----------------------------------------------------------------------------------------------------*/
 		for( iCnt2 = 0; iCnt2 <  iPtrnSize ; iCnt2 += 2)
 		{
@@ -2314,11 +2317,11 @@ UINT16 MC_MemStressTest (BOOLEAN bECC, BOOLEAN bQuick )
 
 
 	/*-----------------------------------------------------------------------------------------------------*/
-	/* Walking-1 pattern test                                          */
+	/* Walking-1 pattern test                                                                              */
 	/*-----------------------------------------------------------------------------------------------------*/
 
 	/*-----------------------------------------------------------------------------------------------------*/
-	/*  Write pattern                                              */
+	/*  Write pattern                                                                                      */
 	/*-----------------------------------------------------------------------------------------------------*/
 	dstAddrStart = (UINT16 *)0x1000;
 	for( iCnt2 = 0; iCnt2 <  iWalkers ; iCnt2++)
@@ -2328,7 +2331,7 @@ UINT16 MC_MemStressTest (BOOLEAN bECC, BOOLEAN bQuick )
 	}
 
 	/*-----------------------------------------------------------------------------------------------------*/
-	/* Verify pattern                                              */
+	/* Verify pattern                                                                                      */
 	/*-----------------------------------------------------------------------------------------------------*/
 	dstAddrStart = (UINT16 *)0x1000;
 	for( iCnt2 = 0; iCnt2 <  iWalkers ; iCnt2++)
@@ -2349,11 +2352,11 @@ UINT16 MC_MemStressTest (BOOLEAN bECC, BOOLEAN bQuick )
 	}
 
 	/*-----------------------------------------------------------------------------------------------------*/
-	/* Walking-0 pattern test                                            */
+	/* Walking-0 pattern test                                                                              */
 	/*-----------------------------------------------------------------------------------------------------*/
 
 	/*-----------------------------------------------------------------------------------------------------*/
-	/*  Write pattern                                              */
+	/*  Write pattern                                                                                      */
 	/*-----------------------------------------------------------------------------------------------------*/
 	dstAddrStart = (UINT16 *)0x1000;
 	for( iCnt2 = 0; iCnt2 <  iWalkers ; iCnt2++)
@@ -2363,7 +2366,7 @@ UINT16 MC_MemStressTest (BOOLEAN bECC, BOOLEAN bQuick )
 	}
 
 	/*-----------------------------------------------------------------------------------------------------*/
-	/* Verify pattern                                              */
+	/* Verify pattern                                                                                      */
 	/*-----------------------------------------------------------------------------------------------------*/
 	dstAddrStart = (UINT16 *)0x1000;
 	for( iCnt2 = 0; iCnt2 <  iWalkers ; iCnt2++)
@@ -2385,11 +2388,11 @@ UINT16 MC_MemStressTest (BOOLEAN bECC, BOOLEAN bQuick )
 
 
 	/*-----------------------------------------------------------------------------------------------------*/
-	/*                   Walking dead pattern test                     */
+	/*                   Walking dead pattern test                                                         */
 	/*-----------------------------------------------------------------------------------------------------*/
 
 	/*-----------------------------------------------------------------------------------------------------*/
-	/*  Write pattern                                              */
+	/*  Write pattern                                                                                      */
 	/*-----------------------------------------------------------------------------------------------------*/
 	dstAddrStart = (UINT16 *)0x1000;
 	for( iCnt2 = 0; iCnt2 <  iWalkers ; iCnt2++)
@@ -2406,7 +2409,7 @@ UINT16 MC_MemStressTest (BOOLEAN bECC, BOOLEAN bQuick )
 	}
 
 	/*-----------------------------------------------------------------------------------------------------*/
-	/* Verify pattern                                              */
+	/* Verify pattern                                                                                      */
 	/*-----------------------------------------------------------------------------------------------------*/
 	dstAddrStart = (UINT16 *)0x1000;
 	for( iCnt2 = 0; iCnt2 <  iWalkers ; iCnt2++)
@@ -2435,11 +2438,11 @@ UINT16 MC_MemStressTest (BOOLEAN bECC, BOOLEAN bQuick )
 
 
 	/*-----------------------------------------------------------------------------------------------------*/
-	/*                    Walking dead1 pattern test                       */
+	/*                    Walking dead1 pattern test                                                       */
 	/*-----------------------------------------------------------------------------------------------------*/
 
 	/*-----------------------------------------------------------------------------------------------------*/
-	/*  Write pattern                                              */
+	/*  Write pattern                                                                                      */
 	/*-----------------------------------------------------------------------------------------------------*/
 	dstAddrStart = (UINT16 *)0x1000;
 	for( iCnt2 = 0; iCnt2 <  iWalkers ; iCnt2++)
@@ -2456,7 +2459,7 @@ UINT16 MC_MemStressTest (BOOLEAN bECC, BOOLEAN bQuick )
 	}
 
 	/*-----------------------------------------------------------------------------------------------------*/
-	/* Verify pattern                                              */
+	/* Verify pattern                                                                                      */
 	/*-----------------------------------------------------------------------------------------------------*/
 	dstAddrStart = (UINT16 *)0x1000;
 	for( iCnt2 = 0; iCnt2 <  iWalkers ; iCnt2++)
@@ -2487,11 +2490,11 @@ UINT16 MC_MemStressTest (BOOLEAN bECC, BOOLEAN bQuick )
 
 
 	/*-----------------------------------------------------------------------------------------------------*/
-	/*                     Walking dead2 pattern test                      */
+	/*                     Walking dead2 pattern test                                                      */
 	/*-----------------------------------------------------------------------------------------------------*/
 
 	/*-----------------------------------------------------------------------------------------------------*/
-	/*  Write pattern                                              */
+	/*  Write pattern                                                                                      */
 	/*-----------------------------------------------------------------------------------------------------*/
 	dstAddrStart = (UINT16 *)0x1000;
 	for( iCnt2 = 0; iCnt2 <  iWalkers ; iCnt2++)
@@ -2508,7 +2511,7 @@ UINT16 MC_MemStressTest (BOOLEAN bECC, BOOLEAN bQuick )
 	}
 
 	/*-----------------------------------------------------------------------------------------------------*/
-	/* Verify pattern                                              */
+	/* Verify pattern                                                                                      */
 	/*-----------------------------------------------------------------------------------------------------*/
 	dstAddrStart = (UINT16 *)0x1000;
 	for( iCnt2 = 0; iCnt2 <  iWalkers ; iCnt2++)
@@ -2539,8 +2542,8 @@ UINT16 MC_MemStressTest (BOOLEAN bECC, BOOLEAN bQuick )
 	// Lior: move bootblock test to last test since this test take too much time (first it copy then it check)
 #if  ((defined(DEBUG_LOG) || defined(DEV_LOG)) && defined(NPCM750))
 	/*-----------------------------------------------------------------------------------------------------*/
-	/*  Use bootblock source code as a pseudo random pattern to test the DDR                   */
-	/*  Copy BB code segment to the DDR                                    */
+	/*  Use bootblock source code as a pseudo random pattern to test the DDR                               */
+	/*  Copy BB code segment to the DDR                                                                    */
 	/*-----------------------------------------------------------------------------------------------------*/
 	dstAddrStart = (UINT16 *)0x1000;
 
@@ -2552,7 +2555,7 @@ UINT16 MC_MemStressTest (BOOLEAN bECC, BOOLEAN bQuick )
 
 
 	/*-----------------------------------------------------------------------------------------------------*/
-	/* Compare BB code segment to the DDR                                  */
+	/* Compare BB code segment to the DDR                                                                  */
 	/*-----------------------------------------------------------------------------------------------------*/
 	dstAddrStart = (UINT16 *)0x1000;
 
@@ -2965,7 +2968,7 @@ static void MC_Enable_ECC_l (void)
 		return;
 	}
 
-	serial_printf(">Enable ECC\n");
+	serial_printf(KMAG "\n>Enable ECC\n" KNRM);
 	clksel = REG_READ(CLKSEL);  // save clock current settings
 	SET_REG_FIELD(CLKSEL, CLKSEL_CPUCKSEL, CLKSEL_CPUCKSEL_CLKREF);  // set CPU  to CLKREF clock (25 MHz)
 	CLK_Delay_MicroSec(10);  // some delay after clock MUX change
@@ -2973,7 +2976,7 @@ static void MC_Enable_ECC_l (void)
 	REG_WRITE(CLKSEL, clksel); // restore clocks to normal
 	CLK_Delay_MicroSec(10);  // some delay after clock MUX change
 	IOW32(MC_BASE_ADDR + (ECC_DISABLE_W_UC_ERR_ADDR*4), DENALI_CTL_94_DATA_ECC);
-	IOW32(MC_BASE_ADDR + 4*INT_MASK_ADDR, 0x0FFFFFFF);    // enable only ECC interrupts
+	IOW32(MC_BASE_ADDR + 4*INT_MASK_ADDR, 0xFFFFFFFF);    // disable all interrupts, including ECC.
 
 	serial_printf("\n\n\n");
 
@@ -3320,7 +3323,7 @@ static DEFS_STATUS Sweep_Input_DSQ_Enhanced_Training_l (MC_INIT_VALUES *mc_init_
 /*---------------------------------------------------------------------------------------------------------*/
 /* Function:		MC_ConfigureDDR									   */
 /*													   */
-/* Parameters:		UINT8 mc_config : value from  BOOTBLOCK_Get_MC_config (BB header)			   */
+/* Parameters:		UINT8 mc_config : value from  BOOTBLOCK_Get_MC_config (BB header)	           */
 /* Returns:		status										   */
 /* Side effects:	none										   */
 /* Description:												   */
@@ -3389,19 +3392,23 @@ DEFS_STATUS MC_ConfigureDDR ( UINT8 mc_config , MC_INIT_VALUES *mc_init_s )
 		serial_printf(KRED "****************************\n" KNRM);
 		serial_printf(KRED "*** Your SDRAM is Faulty ***\n" KNRM);
 		serial_printf(KRED "****************************\n" KNRM);
-#if  ((defined(DEBUG_LOG) || defined(DEV_LOG)) && defined(NPCM750))
-		CFG_HeartBeatToggle(5);    //  This function never returns! it blinks forever. This is for debug versions.
-#endif
-		return (status);
+
+
+		return status;
 	}
 
 	// after initialization we set INTCR2.MC_Init_l to mark that initialization was finished
 
 	dramSize = MC_CheckDramSize();
+
+	if (dramSize == 0)
+	{
+		return DEFS_STATUS_FAIL;
+	}
 	MC_UpdateDramSize(dramSize);
 
 	/*-----------------------------------------------------------------------------------------------------*/
-	/* Check if ECC device is selected  : init the memory size and enable ECC				   */
+	/* Check if ECC device is selected  : init the memory size and enable ECC		    	   */
 	/*-----------------------------------------------------------------------------------------------------*/
 	if ( LANE_MASK == LANE_MASK_MAX)
 	{
@@ -3430,12 +3437,17 @@ DEFS_STATUS MC_ConfigureDDR ( UINT8 mc_config , MC_INIT_VALUES *mc_init_s )
 			serial_printf(KRED "***********************************\n" KNRM);
 			serial_printf(KRED "*** Your ECC device is Faulty   ***\n" KNRM);
 			serial_printf(KRED "***********************************\n" KNRM);
-			return (status);
+			return status;
 		}
 		else
 		{
 			MC_PrintLeveling(TRUE, TRUE);
 
+			if (MC_MemStressTest(TRUE, FALSE) & 0x7F)
+			{
+				serial_printf(KRED "ECC: Final mem test failed, retry training \n" KNRM );
+				return DEFS_STATUS_FAIL;
+			}
 		}
 #if  ((defined(DEBUG_LOG) || defined(DEV_LOG)) && defined(NPCM750))
 		Tock();
@@ -3443,7 +3455,7 @@ DEFS_STATUS MC_ConfigureDDR ( UINT8 mc_config , MC_INIT_VALUES *mc_init_s )
 		serial_printf(">Zero the memory\n");
 
 		/*---------------------------------------------------------------------------------------------*/
-		/* Write zeros to the entire memory                                */
+		/* Write zeros to the entire memory                                                            */
 		/*---------------------------------------------------------------------------------------------*/
 #pragma push
 #pragma diag_suppress 2748  /* iCnt WILL point at 0 . I know what I'm doing . */
@@ -3460,27 +3472,32 @@ DEFS_STATUS MC_ConfigureDDR ( UINT8 mc_config , MC_INIT_VALUES *mc_init_s )
 		Tock();
 #endif
 
-		IOW32(MC_BASE_ADDR + 4*INT_MASK_ADDR, DENALI_CTL_118_DATA);
 	}
 	else
 	{
 		serial_printf(KCYN ">ECC is NOT enabled.\n" KNRM);
+
+		if (MC_MemStressTest(FALSE, FALSE) & 0xFFFF)
+		{
+			serial_printf(KRED "Final mem test failed, retry training \n" KNRM);
+			return DEFS_STATUS_FAIL;
+		}
 	}
 
 
 	SET_REG_FIELD(INTCR2, INTCR2_MC_INIT, 1);
 
-	return (status);
+	return status;
 }
 
 /*---------------------------------------------------------------------------------------------------------*/
-/* Function:		MC_UpdateDramSize									   */
-/*                                                     */
-/* Parameters:      none                                           */
-/* Returns:     none                                           */
-/* Side effects:                                               */
-/* Description:                                                */
-/*          Update refresh rate according to size                          */
+/* Function:		MC_UpdateDramSize								   */
+/*                                                                                                         */
+/* Parameters:      none                                                                                   */
+/* Returns:     none                                                                                       */
+/* Side effects:                                                                                           */
+/* Description:                                                                                            */
+/*          Update refresh rate according to size                                                          */
 /*---------------------------------------------------------------------------------------------------------*/
 void MC_UpdateDramSize (UINT iDramSize)
 {

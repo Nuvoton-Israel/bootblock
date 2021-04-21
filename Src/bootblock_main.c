@@ -73,6 +73,7 @@ void           (*BOOTBLOCK_Init_Before_Image_Check_Vendor) (void);
 void           (*BOOTBLOCK_Init_Before_UBOOT_Vendor) (void);
 void           (*BOOTBLOCK_Init_GPIO_Vendor) (void);
 
+//#define _UNIT_TEST_
 #ifdef _UNIT_TEST_
 // for tests:
 #include "bootblock_unit_test.c"
@@ -121,8 +122,9 @@ void bootblock_main (void)
 	BOOT_HEADER_T * header;
 #endif
 	UINT32			bootblockVersion = bb_version.BootblockVersion;
-	char reset[6];
+	char reset[8];
 	MC_INIT_VALUES mc_init_s;
+	UINT32 retry;
 
 	Tick();
 
@@ -456,6 +458,10 @@ void bootblock_main (void)
 				serial_printf(KRED "\n>ERROR: if cpu freq != mc freq can't set TOCK to 125MHz. \nNeed on unused PLL for this\n" KNRM);
 	}
 
+#if 0 // def _UNIT_TEST_
+	BOOTBLOCK_unit_test_2_clock();
+#endif
+
 
 
 	// print last reset type:
@@ -607,31 +613,44 @@ void bootblock_main (void)
 
 	}
 
+#ifdef _UNIT_TEST_
+	BOOTBLOCK_unit_test_3_mc();
+#endif
 
 	/*-------------------------------------------------------------------------------------------------*/
 	/* Memory Controller Init                                                                          */
 	/*-------------------------------------------------------------------------------------------------*/
 	BOOTBLOCK_Get_MC_Init_val(&mc_init_s);
-	status = MC_ConfigureDDR(BOOTBLOCK_Get_MC_config(), &mc_init_s);
 
-	/*-------------------------------------------------------------------------------------------------*/
-	/* If secondary reset MC init skipped. And this is OK.                                             */
-	/*-------------------------------------------------------------------------------------------------*/
-	if ( status == DEFS_STATUS_SYSTEM_NOT_INITIALIZED)
+	retry = 0;
+	do
 	{
-		serial_printf(KBLU  "\n>Skip DDR init.\n" KNRM );
-	}
-	else if ( status != DEFS_STATUS_OK)
-	{
-	// DDR init fail  (BMC can load code to RAM2 or XIP from flash, but the SDRAM is not usable    )
-		serial_printf(KRED  "\n\n>ERROR: DDR INIT FAIL.\n\n" KNRM );
+		status = MC_ConfigureDDR(BOOTBLOCK_Get_MC_config(), &mc_init_s);
+		retry++;
 
-		goto return_to_rom;
-	}
-	else
-	{
-		serial_printf(KMAG  "\n>DDR init pass\n" KNRM );
-	}
+		/*-------------------------------------------------------------------------------------------------*/
+		/* If secondary reset MC init skipped. And this is OK.                                             */
+		/*-------------------------------------------------------------------------------------------------*/
+		if ( status == DEFS_STATUS_SYSTEM_NOT_INITIALIZED)
+		{
+			serial_printf(KBLU  "\n>Skip DDR init.\n" KNRM );
+			break;
+		}
+
+		if (status == DEFS_STATUS_OK)
+		{
+			serial_printf(KGRN  "\n>DDR init pass\n" KNRM );
+			break;
+		}
+
+		if( retry == 5)
+		{
+			serial_printf(KRED  "\n\n>ERROR: DDR INIT FAIL.\n\n" KNRM );
+
+			goto return_to_rom;
+		}
+	} while ((status != DEFS_STATUS_OK) && (retry < 5));
+
 
 	/*-----------------------------------------------------------------------------------------------------*/
 	/*  DDR init pass: check SDRAM size and copy vectors to it                                             */

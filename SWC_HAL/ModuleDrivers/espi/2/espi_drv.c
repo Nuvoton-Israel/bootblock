@@ -156,9 +156,9 @@ typedef struct
 /*---------------------------------------------------------------------------------------------------------*/
 typedef _PACK_(struct)
 {
-    UINT8    rqLsLv8_9; // Reserved for read/write request
-    UINT8    lv0_7;
-    UINT8    reserved[2];
+    _PACK_(UINT8    rqLsLv8_9); // Reserved for read/write request
+    _PACK_(UINT8    lv0_7);
+    _PACK_(UINT8    reserved[2]);
 } ESPI_PC_BM_LTR_MSG_HDR_T;
 
 /*---------------------------------------------------------------------------------------------------------*/
@@ -184,8 +184,8 @@ typedef struct
 /*---------------------------------------------------------------------------------------------------------*/
 typedef _PACK_(struct)
 {
-    UINT8               msgCode;
-    UINT8               cycleType;
+    _PACK_(UINT8        msgCode);
+    _PACK_(UINT8        cycleType);
     _PACK_(UINT16       tagPlusLength);
     _PACK_(union)
     {
@@ -882,7 +882,9 @@ static DEFS_STATUS  ESPI_PC_BM_ReadReqAuto_l                (UINT64 offset, UINT
 static void         ESPI_PC_BM_HandleReqRes_l               (void);
 static void         ESPI_PC_BM_HandleInMessage_l            (void);
 static void         ESPI_PC_BM_AutoModeTransDoneHandler_l   (UINT32 status, UINT32 intEnable);
-static void         ESPI_PC_BM_GdmaIntHandler_l             (DEFS_STATUS status, UINT32 transferLen);
+#ifdef GDMA_MODULE_TYPE
+static void         ESPI_PC_BM_GdmaIntHandler_l             (UINT8  module, UINT8 channel, DEFS_STATUS status, UINT32 transferLen);
+#endif
 static void         ESPI_PC_BM_ExitAutoReadRequest_l        (DEFS_STATUS status, BOOLEAN useDMA);
 static void         ESPI_PC_BM_HandleBurstErr_l             (BOOLEAN useDMA);
 static DEFS_STATUS  ESPI_PC_BM_EnqueuePacket_l              (ESPI_PC_MSG_T msgType);
@@ -924,8 +926,10 @@ static DEFS_STATUS  ESPI_FLASH_EnqueuePacket_l      (void);
 static void         ESPI_FLASH_HandleReqRes_l       (void);
 static DEFS_STATUS  ESPI_FLASH_ReceiveDataBuffer_l  (ESPI_FLASH_REQ_ACC_T reqType, UINT32* buffer, BOOLEAN strpHdr,
                                                      UINT32 size);
-static void         ESPI_FLASH_GdmaIntHandler_l     (DEFS_STATUS status, UINT32 transferLen);
-static void         ESPI_FLASH_AutoModeTransDoneHandler_l (UINT32 status, UINT32 intEnable);
+#ifdef GDMA_MODULE_TYPE
+static void         ESPI_FLASH_GdmaIntHandler_l     (UINT8 module, UINT8 channel, DEFS_STATUS status, UINT32 transferLen);
+#endif
+static void         ESPI_FLASH_AutoModeTransDoneHandler_l (UINT8 module, UINT8 channel, UINT32 status, UINT32 intEnable);
 static DEFS_STATUS  ESPI_FLASH_GetCurrReqSize_l     (ESPI_FLASH_REQ_ACC_T reqType, UINT32 flashOffset, UINT32 size,
                                                      UINT32* currSize);
 static void         ESPI_FLASH_HandleAutoModeErr_l  (BOOLEAN useDMA);
@@ -1658,7 +1662,9 @@ void ESPI_IntHandler (void)
         {
             if (READ_VAR_FIELD(intEnable, ESPIIE_AMDONEIE))
             {
-                ESPI_FLASH_AutoModeTransDoneHandler_l(status, intEnable);
+#ifdef GDMA_MODULE_TYPE
+                ESPI_FLASH_AutoModeTransDoneHandler_l(ESPI_GDMA_MODULE, ESPI_FLASH_GDMA_CHANNEL, status, intEnable);
+#endif
             }
         }
 
@@ -4093,8 +4099,8 @@ DEFS_STATUS ESPI_OOB_PECI_Trans (
     UINT32                  data_1
 )
 {
-    UINT8   nWrite      = wr_length + 3; // + PECI Target Address, Write Length, Read Length
-    UINT8   nRead       = rd_length + 1; // + PECI Response/Error Status
+    UINT8   nWrite  = wr_length + 3; // + PECI Target Address, Write Length, Read Length
+    UINT8   nRead   = rd_length + 1; // + PECI Response/Error Status
     UINT    awFcsIndex;
 
     /*-----------------------------------------------------------------------------------------------------*/
@@ -5410,14 +5416,14 @@ static DEFS_STATUS  ESPI_PC_BM_ReadReqAuto_l (
         /*-------------------------------------------------------------------------------------------------*/
         /* Initialize GDMA module                                                                          */
         /*-------------------------------------------------------------------------------------------------*/
-        DEFS_STATUS_RET_CHECK(GDMA_InitEspi(ESPI_PC_BM_GDMA_CHANNEL));
+        DEFS_STATUS_RET_CHECK(GDMA_InitEspi(ESPI_GDMA_MODULE, ESPI_PC_BM_GDMA_CHANNEL));
 
         /*-------------------------------------------------------------------------------------------------*/
         /* Find relevant transfer width according to input buffer                                          */
         /*-------------------------------------------------------------------------------------------------*/
         if ((UINT32)buffer % _16B_ == 0)
         {
-            DEFS_STATUS_RET_CHECK(GDMA_Config(ESPI_PC_BM_GDMA_CHANNEL, FALSE,FALSE,GDMA_TRANSFER_WIDTH_16B));
+            DEFS_STATUS_RET_CHECK(GDMA_Config(ESPI_GDMA_MODULE, ESPI_PC_BM_GDMA_CHANNEL, FALSE,FALSE,GDMA_TRANSFER_WIDTH_16B));
             /*---------------------------------------------------------------------------------------------*/
             /* Define threshold value of the flash receive buffer above which a DMA request is asserted    */
             /*---------------------------------------------------------------------------------------------*/
@@ -5425,7 +5431,7 @@ static DEFS_STATUS  ESPI_PC_BM_ReadReqAuto_l (
         }
         else if ((UINT32)buffer % _4B_ == 0)
         {
-            DEFS_STATUS_RET_CHECK(GDMA_Config(ESPI_PC_BM_GDMA_CHANNEL, FALSE,FALSE,GDMA_TRANSFER_WIDTH_4B));
+            DEFS_STATUS_RET_CHECK(GDMA_Config(ESPI_GDMA_MODULE, ESPI_PC_BM_GDMA_CHANNEL, FALSE,FALSE,GDMA_TRANSFER_WIDTH_4B));
             /*---------------------------------------------------------------------------------------------*/
             /* Define threshold value of the flash receive buffer above which a DMA request is asserted    */
             /*---------------------------------------------------------------------------------------------*/
@@ -5471,7 +5477,7 @@ static DEFS_STATUS  ESPI_PC_BM_ReadReqAuto_l (
         ESPI_PC_BM_RX_INTERRUPT_SAVE_DISABLE(ESPI_PC_BM_RXIE_L);
         ESPI_PC_BM_TXDONE_INTERRUPT_SAVE_DISABLE(ESPI_PC_BM_TXDONE_L);
 
-        status = GDMA_Transfer(ESPI_PC_BM_GDMA_CHANNEL, REG_ADDR(ESPI_PBMRXRDHEAD), (UINT8*)buffer, size, ESPI_PC_BM_GdmaIntHandler_l);
+        status = GDMA_Transfer(ESPI_GDMA_MODULE, ESPI_PC_BM_GDMA_CHANNEL, REG_ADDR(ESPI_PBMRXRDHEAD), (UINT8*)buffer, size, ESPI_PC_BM_GdmaIntHandler_l);
         if (status != DEFS_STATUS_OK)
         {
             ESPI_PC_BM_ExitAutoReadRequest_l(status, useDMA);
@@ -5782,6 +5788,7 @@ static void ESPI_PC_BM_HandleInMessage_l (void)
     /*-----------------------------------------------------------------------------------------------------*/
     /* Read header from receive buffer                                                                     */
     /*-----------------------------------------------------------------------------------------------------*/
+    header.tagPlusLength = 0x00;
     loopCount = ESPI_PC_MSG_HDR_SIZE / sizeof(UINT32);
     dest = ((UINT32*)(void*)&header);
     for (i = 0; i < loopCount; i++)
@@ -5929,10 +5936,13 @@ static void ESPI_PC_BM_AutoModeTransDoneHandler_l (
     }
 }
 
+#ifdef GDMA_MODULE_TYPE
 /*---------------------------------------------------------------------------------------------------------*/
 /* Function:        ESPI_PC_BM_GdmaIntHandler_l                                                            */
 /*                                                                                                         */
 /* Parameters:                                                                                             */
+/*                  module      - GDMA module number                                                       */
+/*                  channel     - GDMA channel number                                                      */
 /*                  status      - GDMA operation status                                                    */
 /*                  transferLen - number of transferred bytes                                              */
 /*                                                                                                         */
@@ -5943,12 +5953,15 @@ static void ESPI_PC_BM_AutoModeTransDoneHandler_l (
 /*lint -e{715}      Suppress 'status/transferLen' not referenced                                           */
 /*---------------------------------------------------------------------------------------------------------*/
 static void ESPI_PC_BM_GdmaIntHandler_l (
+    UINT8       module,
+    UINT8       channel,
     DEFS_STATUS status,
     UINT32      transferLen
 )
 {
     //Do nothing, waiting on burst done interrupt
 }
+#endif
 
 /*---------------------------------------------------------------------------------------------------------*/
 /* Function:        ESPI_PC_BM_ExitAutoReadRequest_l                                                       */
@@ -6739,7 +6752,7 @@ static DEFS_STATUS ESPI_FLASH_ReadReqAuto_l (
 #ifndef ESPI_CAPABILITY_FLASH_AUTO_READ_OFFSET_ALIGN
     UINT32      sizeCeilPow2;
 #endif
-#if !defined GDMA_MODULE_TYPE
+#ifndef GDMA_MODULE_TYPE
     DEFS_STATUS_COND_CHECK((useDMA == FALSE), DEFS_STATUS_INVALID_PARAMETER);
 #endif
     /*-----------------------------------------------------------------------------------------------------*/
@@ -6784,7 +6797,7 @@ static DEFS_STATUS ESPI_FLASH_ReadReqAuto_l (
 
     if (useDMA)
     {
-#if defined GDMA_MODULE_TYPE
+#ifdef GDMA_MODULE_TYPE
         /*-------------------------------------------------------------------------------------------------*/
         /* Strip header                                                                                    */
         /*-------------------------------------------------------------------------------------------------*/
@@ -6793,14 +6806,14 @@ static DEFS_STATUS ESPI_FLASH_ReadReqAuto_l (
         /*-------------------------------------------------------------------------------------------------*/
         /* Initialize GDMA module                                                                          */
         /*-------------------------------------------------------------------------------------------------*/
-        DEFS_STATUS_RET_CHECK(GDMA_InitEspi(ESPI_FLASH_GDMA_CHANNEL));
+        DEFS_STATUS_RET_CHECK(GDMA_InitEspi(ESPI_GDMA_MODULE, ESPI_FLASH_GDMA_CHANNEL));
 
         /*-------------------------------------------------------------------------------------------------*/
         /* Find relevant transfer width according to input buffer                                          */
         /*-------------------------------------------------------------------------------------------------*/
         if ((UINT32)buffer % _16B_ == 0)
         {
-            DEFS_STATUS_RET_CHECK(GDMA_Config(ESPI_FLASH_GDMA_CHANNEL, FALSE, FALSE, GDMA_TRANSFER_WIDTH_16B));
+            DEFS_STATUS_RET_CHECK(GDMA_Config(ESPI_GDMA_MODULE, ESPI_FLASH_GDMA_CHANNEL, FALSE, FALSE, GDMA_TRANSFER_WIDTH_16B));
             /*---------------------------------------------------------------------------------------------*/
             /* Define threshold value of the flash receive buffer above which a DMA request is asserted    */
             /*---------------------------------------------------------------------------------------------*/
@@ -6808,7 +6821,7 @@ static DEFS_STATUS ESPI_FLASH_ReadReqAuto_l (
         }
         else if ((UINT32)buffer % _4B_ == 0)
         {
-            DEFS_STATUS_RET_CHECK(GDMA_Config(ESPI_FLASH_GDMA_CHANNEL, FALSE, FALSE, GDMA_TRANSFER_WIDTH_4B));
+            DEFS_STATUS_RET_CHECK(GDMA_Config(ESPI_GDMA_MODULE, ESPI_FLASH_GDMA_CHANNEL, FALSE, FALSE, GDMA_TRANSFER_WIDTH_4B));
             /*---------------------------------------------------------------------------------------------*/
             /* Define threshold value of the flash receive buffer above which a DMA request is asserted    */
             /*---------------------------------------------------------------------------------------------*/
@@ -6857,9 +6870,9 @@ static DEFS_STATUS ESPI_FLASH_ReadReqAuto_l (
 
     if (useDMA)
     {
-#if defined GDMA_MODULE_TYPE
+#ifdef GDMA_MODULE_TYPE
         ESPI_FLASH_RX_INTERRUPT_SAVE_DISABLE(ESPI_FLASH_RXIE_L);
-        status = (GDMA_Transfer(ESPI_FLASH_GDMA_CHANNEL, REG_ADDR(ESPI_FLASHRXRDHEAD), (UINT8*)buffer, size, ESPI_FLASH_GdmaIntHandler_l));
+        status = (GDMA_Transfer(ESPI_GDMA_MODULE, ESPI_FLASH_GDMA_CHANNEL, REG_ADDR(ESPI_FLASHRXRDHEAD), (UINT8*)buffer, size, ESPI_FLASH_GdmaIntHandler_l));
         if (status != DEFS_STATUS_OK)
         {
             ESPI_FLASH_ExitAutoReadRequest_l(status, useDMA);
@@ -7314,10 +7327,13 @@ static DEFS_STATUS ESPI_FLASH_ReceiveDataBuffer_l (
     return DEFS_STATUS_OK;
 }
 
+#ifdef GDMA_MODULE_TYPE
 /*---------------------------------------------------------------------------------------------------------*/
 /* Function:        ESPI_FLASH_GdmaIntHandler_l                                                            */
 /*                                                                                                         */
 /* Parameters:                                                                                             */
+/*                  module      - GDMA module number                                                       */
+/*                  channel     - GDMA channel number                                                      */
 /*                  status      - GDMA operation status                                                    */
 /*                  transferLen - number of transferred bytes                                              */
 /*                                                                                                         */
@@ -7325,9 +7341,11 @@ static DEFS_STATUS ESPI_FLASH_ReceiveDataBuffer_l (
 /* Side effects:                                                                                           */
 /* Description:                                                                                            */
 /*                  This routine handles GDMA interrupt handler.                                           */
-/*lint -e{715}      Suppress 'status/transferLen' not referenced                                           */
+/*lint -e{715}      Suppress 'module/channel/status/transferLen' not referenced                            */
 /*---------------------------------------------------------------------------------------------------------*/
 static void ESPI_FLASH_GdmaIntHandler_l (
+    UINT8       module,
+    UINT8       channel,
     DEFS_STATUS status,
     UINT32      transferLen
 )
@@ -7339,6 +7357,8 @@ static void ESPI_FLASH_GdmaIntHandler_l (
 /* Function:        ESPI_FLASH_AutoModeTransDoneHandler_l                                                  */
 /*                                                                                                         */
 /* Parameters:                                                                                             */
+/*                  module      - GDMA module number                                                       */
+/*                  channel     - GDMA channel number                                                      */
 /*                  status      - ESPI status register value                                               */
 /*                  intEnable   - ESPI interrupt enable register value                                     */
 /*                                                                                                         */
@@ -7346,12 +7366,16 @@ static void ESPI_FLASH_GdmaIntHandler_l (
 /* Side effects:                                                                                           */
 /* Description:                                                                                            */
 /*                  This routine handles automatic mode transfer done interrupt                            */
+/*lint -e{715}      Suppress 'module/channel' not referenced                                               */
 /*---------------------------------------------------------------------------------------------------------*/
 static void ESPI_FLASH_AutoModeTransDoneHandler_l (
+    UINT8  module,
+    UINT8  channel,
     UINT32 status,
     UINT32 intEnable
 )
 {
+#ifdef GDMA_MODULE_TYPE
     /*-----------------------------------------------------------------------------------------------------*/
     /* If its DMA mode                                                                                     */
     /*-----------------------------------------------------------------------------------------------------*/
@@ -7374,6 +7398,7 @@ static void ESPI_FLASH_AutoModeTransDoneHandler_l (
         SET_REG_FIELD(ESPI_FLASHCTL, FLASHCTL_DMATHRESH, ESPI_FLASH_DMA_THRESHOLD_DISABLE);
 #endif
     }
+#endif
 
     /*-----------------------------------------------------------------------------------------------------*/
     /* Clear request information                                                                           */
@@ -7424,6 +7449,7 @@ static void ESPI_FLASH_AutoModeTransDoneHandler_l (
         }
     }
 }
+#endif
 
 /*---------------------------------------------------------------------------------------------------------*/
 /* Function:        ESPI_FLASH_GetCurrReqSize_l                                                            */
@@ -7540,6 +7566,7 @@ static void ESPI_FLASH_HandleAutoModeErr_l (BOOLEAN useDMA)
 
     if (useDMA)
     {
+#ifdef GDMA_MODULE_TYPE
         /*-------------------------------------------------------------------------------------------------*/
         /* Disable DMA request                                                                             */
         /*-------------------------------------------------------------------------------------------------*/
@@ -7549,6 +7576,7 @@ static void ESPI_FLASH_HandleAutoModeErr_l (BOOLEAN useDMA)
         /* Restore interrupts handling                                                                     */
         /*-------------------------------------------------------------------------------------------------*/
         ESPI_FLASH_RX_INTERRUPT_RESTORE(ESPI_FLASH_RXIE_L);
+#endif
     }
 
     ESPI_FLASH_status_L = DEFS_STATUS_FAIL;
@@ -7577,6 +7605,7 @@ static void ESPI_FLASH_ExitAutoReadRequest_l (
     }
     if (useDMA)
     {
+#ifdef GDMA_MODULE_TYPE
         if (READ_REG_FIELD(ESPI_ESPISTS,ESPISTS_FLASHRX) == TRUE)
         {
             /*---------------------------------------------------------------------------------------------*/
@@ -7595,6 +7624,7 @@ static void ESPI_FLASH_ExitAutoReadRequest_l (
         /* Disable DMA                                                                                     */
         /*-------------------------------------------------------------------------------------------------*/
         SET_REG_FIELD(ESPI_FLASHCTL, FLASHCTL_DMATHRESH, ESPI_FLASH_DMA_THRESHOLD_DISABLE);
+#endif
 #endif
     }
 
@@ -8548,7 +8578,7 @@ static void ESPI_OOB_USB_ReceiveMessage_l (void)
             /* A status of 00h indicates successful completion.                                            */
             /* A status of 01h indicates an error occurred                                                 */
             /*---------------------------------------------------------------------------------------------*/
-            status = (DEFS_STATUS)ESPI_OOB_cmdInfo[ESPI_OOB_CMD_CSME].readBuf[3];
+            status = (ESPI_OOB_cmdInfo[ESPI_OOB_CMD_CSME].readBuf[3] == 0) ? DEFS_STATUS_OK : DEFS_STATUS_FAIL;
 
             /*---------------------------------------------------------------------------------------------*/
             /* Clear current OOB Command Information                                                       */
