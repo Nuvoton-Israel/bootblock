@@ -99,6 +99,7 @@ void         BOOTBLOCK_Print_Vendor_error (void)
 void BOOTBLOCK_Init_UART_Nuvoton (void)
 {
 	UINT reset_is_PORST = !CFG_GetResetNum();
+	UART_BAUDRATE_T uart_baudrate = UART_BAUDRATE_115200;
 
 	/*-----------------------------------------------------------------------------------------------------*/
 	/* Init UART											   */
@@ -111,17 +112,17 @@ void BOOTBLOCK_Init_UART_Nuvoton (void)
 	    CLK_ResetUART();
 	    CLK_Delay_MicroSec(100);
 	}
-
-
+	
+	uart_baudrate = (UART_BAUDRATE_T)BOOTBLOCK_Get_UART_Baudrate();
 	if (reset_is_PORST)
 	{
 	    // UART0 on UART debug port + mux set
-	    UART_Init(serial_printf_uart_port, UART_MUX_MODE1_HSP1_SI2____HSP2_UART2__UART1_s_HSP1__UART3_s_SI2, UART_BAUDRATE_115200);
+	    UART_Init(serial_printf_uart_port, UART_MUX_MODE1_HSP1_SI2____HSP2_UART2__UART1_s_HSP1__UART3_s_SI2, uart_baudrate);
 	}
 	else
 	{
 	    // UART0 on UART debug port + mux set
-	    UART_Init(serial_printf_uart_port, UART_MUX_SKIP_CONFIG, UART_BAUDRATE_115200);
+	    UART_Init(serial_printf_uart_port, UART_MUX_SKIP_CONFIG, uart_baudrate);
 	}
 
 	CLK_Delay_MicroSec(100);

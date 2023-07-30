@@ -598,18 +598,20 @@ DEFS_STATUS  CLK_ConfigureUSBClock (void)
 /*---------------------------------------------------------------------------------------------------------*/
 /* Function:        CLK_ConfigureUartClock                                                                 */
 /*                                                                                                         */
-/* Parameters:      none                                                                                   */
+/* Parameters:      freq - freq of the source clock                                                        */
+/*                  uartDiv - divisor for uart                                                             */
 /* Returns:                                                                                                */
 /* Side effects:                                                                                           */
 /* Description:                                                                                            */
-/*                  This routine configures the Uart clock source to be closest to 24MHz by                */
-/*                  modifying the UART divider.                                                            */
-/*                  In _PALLADIUM_ bypass mode the UART input frequency is set to be highest possible -    */
-/*                  same as APB frequency                                                                  */
+/*                  This routine configures the Uart clock source to CLKREF (25MHZ), devider will be 7 so  */
+/*                  the uart clock will be 25Mhz/7 = 3.57Mhz, which is lower the default AHB clock.        */
+/*                  Configuring baudrate of 115200, will give actual baudrate of 111600 (3.32% off)        */
+/*                                                                                                         */
+/*                  For PD optimization, the uart divisor and the uart clk (which is later been used to    */
+/*                  calculate the baudrate divisor) will always be set to minimum (1 and 0 accordingly)    */
 /*---------------------------------------------------------------------------------------------------------*/
-UINT32 CLK_ConfigureUartClock(void)
+DEFS_STATUS CLK_ConfigureUartClock (UINT32 freq, UINT32 uartDiv)
 {
-	UINT32 uart_clk; //Hz
 
 #ifdef _PALLADIUM_
 	UINT32 apb_divisor;
@@ -619,7 +621,7 @@ UINT32 CLK_ConfigureUartClock(void)
 	/*-------------------------------------------------------------------------------------------------*/
 
 #ifndef _PALLADIUM_
-	UINT32 uartDesiredFreq  = 24*_1MHz_; //Hz
+
 	UINT32 clkStrp = STRP_Ckfrq_Get();
 
 	if ( (STRP_CLKFRQ_T)clkStrp != STRP_CLKFRQ_OPTION0)
@@ -628,21 +630,26 @@ UINT32 CLK_ConfigureUartClock(void)
 	/*-----------------------------------------------------------------------------------------------------*/
 	{
 		/*-------------------------------------------------------------------------------------------------*/
-		/* Calculate the divider given PLL2 output and desired frequency:                                  */
-		/*-------------------------------------------------------------------------------------------------*/
-		UINT32 pllFreq = CLK_GetPll2Freq();
-		UINT32 uartDiv = pllFreq/uartDesiredFreq;
-		uart_clk = pllFreq / uartDiv;
-
-		/*-------------------------------------------------------------------------------------------------*/
-		/* Set divider:                                                                                    */
+		/* Set divider                                                                                     */
 		/*-------------------------------------------------------------------------------------------------*/
 		SET_REG_FIELD(CLKDIV1, CLKDIV1_UARTDIV, CLKDIV1_UART_DIV(uartDiv));
 
 		/*-------------------------------------------------------------------------------------------------*/
-		/* Choose PLL2 as a source:                                                                        */
+		/* Choose CLKREF as a source:                                                                      */
 		/*-------------------------------------------------------------------------------------------------*/
-		SET_REG_FIELD(CLKSEL, CLKSEL_UARTCKSEL, CLKSEL_UARTCKSEL_PLL2);
+		if (freq == EXT_CLOCK_FREQUENCY_HZ)
+		{
+			SET_REG_FIELD(CLKSEL, CLKSEL_UARTCKSEL, CLKSEL_UARTCKSEL_CLKREF);
+		}
+		else
+		{
+			SET_REG_FIELD(CLKSEL, CLKSEL_UARTCKSEL, CLKSEL_UARTCKSEL_PLL2);
+		}
+
+		/*-----------------------------------------------------------------------------------------------------*/
+		/* Wait for 200 clock cycles between clkDiv change and clkSel change, for clockref it 8us              */
+		/*-----------------------------------------------------------------------------------------------------*/
+		CLK_Delay_MicroSec(20);
 	}
 	else
 	/*-----------------------------------------------------------------------------------------------------*/
@@ -658,8 +665,6 @@ UINT32 CLK_ConfigureUartClock(void)
 		/* Choose CLKREF as a source:                                                                      */
 		/*-------------------------------------------------------------------------------------------------*/
 		SET_REG_FIELD(CLKSEL, CLKSEL_UARTCKSEL, CLKSEL_UARTCKSEL_CLKREF);
-
-		uart_clk = EXT_CLOCK_FREQUENCY_HZ;
 	}
 
 #else //_PALLADIUM_
@@ -704,8 +709,7 @@ UINT32 CLK_ConfigureUartClock(void)
 	/* Wait for 200 clock cycles between clkDiv change and clkSel change:                                  */
 	/*-----------------------------------------------------------------------------------------------------*/
 	CLK_Delay_Cycles(200);
-
-	return uart_clk;
+	return DEFS_STATUS_OK;
 
 }
 #endif // defined (UART_MODULE_TYPE)
@@ -2407,6 +2411,45 @@ UINT8 CLK_GetFIUClockDiv (FIU_MODULE_T  fiu)
 
 }
 #endif// defined (FIU_MODULE_TYPE)
+
+
+
+/*---------------------------------------------------------------------------------------------------------*/
+/* Function:        CLK_GetUartClock                                                                       */
+/*                                                                                                         */
+/* Parameters:      none                                                                                   */
+/* Returns:         none                                                                                   */
+/* Side effects:                                                                                           */
+/* Description:                                                                                            */
+/*                 This routine returns configuration of UART clock                                        */
+/*---------------------------------------------------------------------------------------------------------*/
+UINT32 CLK_GetUartClock (void)
+{
+    UINT32 source = 0;
+    UINT32 sel =  READ_REG_FIELD(CLKSEL, CLKSEL_UARTCKSEL);
+
+    switch (sel)
+    {
+    case CLKSEL_UARTCKSEL_PLL0:
+        source = CLK_GetPll0Freq();
+        break;
+    case CLKSEL_UARTCKSEL_PLL1:
+        source = CLK_GetPll1Freq();
+        break;
+
+    case CLKSEL_UARTCKSEL_PLL2:
+        source = CLK_GetPll2Freq();
+        break;
+
+    case CLKSEL_UARTCKSEL_CLKREF:
+    default:
+        source = EXT_CLOCK_FREQUENCY_HZ;
+        break;
+    }
+
+    return source / ( READ_REG_FIELD(CLKDIV1, CLKDIV1_UARTDIV) + 1);
+}
+
 
 
 /*---------------------------------------------------------------------------------------------------------*/

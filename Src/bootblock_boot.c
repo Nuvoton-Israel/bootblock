@@ -686,6 +686,11 @@ DEFS_STATUS       BOOTBLOCK_ReadHeaderParameter (HEADER_FIELD_T field, UINT8 * r
 		    memcpy(retVal, &bootBlockHeader->header.version   , sizeof (bootBlockHeader->header.version    ));
 		    break;
 		}
+		case HEADER_FIELD_UART_BAUDRATE:
+		{
+			memcpy(retVal, &bootBlockHeader->header.uart_baudrate   , sizeof (bootBlockHeader->header.uart_baudrate ));
+			break;
+		}
 		default:
 		    return DEFS_STATUS_FAIL;
 	}
@@ -823,6 +828,27 @@ UINT32   BOOTBLOCK_Get_MC_freq (void)
 }
 
 
+/*---------------------------------------------------------------------------------------------------------*/
+/* Function:        BOOTBLOCK_Get_UART_Baudrate                                                                  */
+/*                                                                                                         */
+/* Parameters:                                                                                             */
+/*                                                                                                         */
+/* Returns:        get Target Baud Rate (in KHZ) from header. If value is 0 or 0xFFFF return 115200        */
+/*                 example: if uesr wants 460800K, write 460800 on the header at offset 0x170                */
+/*---------------------------------------------------------------------------------------------------------*/
+UINT32   BOOTBLOCK_Get_UART_Baudrate(void)
+{
+	UINT32 val;
+	BOOTBLOCK_ReadHeaderParameter(HEADER_FIELD_UART_BAUDRATE, (UINT8 *)&val, NULL);
+
+	if (val == 0 || val == 0xFFFFFFFF)
+	{
+		val = UART_BAUDRATE_115200;
+	}
+	return (UART_BAUDRATE_T)val;
+	
+
+}
 /*---------------------------------------------------------------------------------------------------------*/
 /* Function:        BOOTBLOCK_Get_CPU_freq                                                                 */
 /*                                                                                                         */

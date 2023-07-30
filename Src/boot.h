@@ -55,7 +55,10 @@ typedef union BOOT_HEADER_tag
 		UINT8   fiu3_cs3_en;                   // 0x11B (At uboot header only) 284       1           FIU3 CS3 enable
 
 		UINT16  mc_freq;                       // 0x11C       2
-		UINT8   reserved[0x22];                // 0x11E       34          Reserved for future use
+		UINT8   reserved2;                      // 0x11E For alignment 
+		UINT8   reserved3;                      // 0x11F For alignment 
+		UINT32  uart_baudrate;                 // 0x120        4
+		UINT8   reserved[0x1C];                // 0x124       28          Reserved for future use
 
 		//  Start signed area:
 		UINT32  destAddr;                      // 0x140       4           Code destination address2, 32-bit aligned                       Yes     No
@@ -191,6 +194,7 @@ typedef enum     HEADER_FIELD_T
 	HEADER_FIELD_WD_NUM=39,
 	HEADER_FIELD_WD_STAY_ON=40,
 	HEADER_FIELD_MC_INIT=0x41,
+	HEADER_FIELD_UART_BAUDRATE=0x42,
 
 } HEADER_FIELD_T;
 
@@ -223,6 +227,8 @@ UINT32         BOOTBLOCK_Get_CPU_freq (void);
 UINT8          BOOTBLOCK_Get_MC_config (void);
 HOST_IF_T      BOOTBLOCK_Get_host_if (void);
 void           BOOTBLOCK_Get_MC_Init_val (MC_INIT_VALUES *mc_init_s);
+UINT32         BOOTBLOCK_Get_UART_Baudrate(void);
+
 
 
 /*---------------------------------------------------------------------------------------------------------*/

@@ -80,7 +80,7 @@ void CLK_ConfigureClocks (void);
 /* Description:                                                                                            */
 /*                  This routine performs UART clock configuration                                         */
 /*---------------------------------------------------------------------------------------------------------*/
-UINT32 CLK_ConfigureUartClock (void);
+DEFS_STATUS CLK_ConfigureUartClock (UINT32 freq, UINT32 uartDiv);
 #endif // defined (UART_MODULE_TYPE)
 
 #if defined (USB_MODULE_TYPE)
