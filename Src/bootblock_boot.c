@@ -183,12 +183,17 @@ DEFS_STATUS      BOOTBLOCK_CheckImageCopyAndJump (BOOT_HEADER_T *uBootHeader, BO
 {
 	DEFS_STATUS         result = DEFS_STATUS_FAIL;
 	int                 ber = 0;
+	unsigned int destAddr = 0;
+	unsigned int codeSize = 0;
+    unsigned int destAddr_ram_copy;
+    unsigned int codeSize_ram_copy;
+    BOOT_HEADER_T *uBootHeader_ram_copy;
 
 	/*-----------------------------------------------------------------------------------------------------*/
 	/* 11. Check Header:                                                                                   */
 	/* In both Secure boot and Basic boot: read from the SPI flash and check the image header validity:    */
 	/*-----------------------------------------------------------------------------------------------------*/
-	result = BOOTBLOCK_CheckUbootHeader_l(uBootHeader, image);
+	result = BOOTBLOCK_CheckUbootHeader_l(uBootHeader, image, &destAddr, &codeSize);
 	if (result != DEFS_STATUS_OK)
 	{
 		return result;
@@ -205,7 +210,7 @@ DEFS_STATUS      BOOTBLOCK_CheckImageCopyAndJump (BOOT_HEADER_T *uBootHeader, BO
 	/*---------------------------------------------------------*/
 	/* Copy the image and the header to destination address:   */
 	/*---------------------------------------------------------*/
-	if (uBootHeader->header.destAddr != 0)
+	if (destAddr != 0)
 	{
 		UINT32 i;
 		UINT32 print_errors;
@@ -213,28 +218,27 @@ DEFS_STATUS      BOOTBLOCK_CheckImageCopyAndJump (BOOT_HEADER_T *uBootHeader, BO
 
 		for (repeat = 0 ; repeat < 2 ; repeat++)
 		{
-		        UINT32* dest   = (UINT32 *)(uBootHeader->header.destAddr);
-		        UINT32* source = (UINT32 *)uBootHeader;
-		        UINT32  size  = (uBootHeader->header.codeSize + sizeof(BOOT_HEADER_T));
+			UINT32* source = (UINT32 *)uBootHeader;
+			UINT32  size  = codeSize + sizeof(BOOT_HEADER_T);
 
-		        memcpy(dest, source, size);
-		        serial_printf(KNRM "\n>copied uboot image to %#lx, size %#lx, from %#lx \n",
-		             (UINT32)uBootHeader->header.destAddr, (UINT32)size, (UINT32)source);
+	        memcpy((UINT32 *)destAddr, source, size);
+			serial_printf(KNRM "\n>copied uboot image to %#lx, size %#lx, from %#lx \n",
+			     destAddr, (UINT32)size, (UINT32)source);
 
-		        if ((ber = memcmp(dest, source, size)) != 0)
-		        {
-		        	serial_printf(KRED "\n\n\n>ERROR! BB failed to copy uboot image to DDR.\nYour DRAM or FLASH device might be faulty.\nBER = %d.\n", ber);
+			if ((ber = memcmp((UINT32 *)destAddr, source, size)) != 0)
+			{
+				serial_printf(KRED "\n\n\n>ERROR! BB failed to copy uboot image to DDR.\nYour DRAM or FLASH device might be faulty.\nBER = %d.\n", ber);
 
 				serial_printf("\n>DRAM                    | FLASH \n\n");
 
 				print_errors = 0;
 				for ( i = 0; i < size/4 ; i++)
 				{
-					if (dest[i] != source[i])
+					if (*(UINT32 *)(destAddr + i)  != source[i])
 					{
 						if(print_errors < 256)
 						        serial_printf(">%#010lx : %#010lx | %#010lx : %#010lx \n",
-				    				(UINT32)(dest+i), dest[i],
+                                    (UINT32)((UINT32 *)destAddr + i), ((UINT32 *)destAddr)[i],
 				    				(UINT32)(source+i), source[i]);
 			    		print_errors++;
 			    	}
@@ -256,17 +260,26 @@ DEFS_STATUS      BOOTBLOCK_CheckImageCopyAndJump (BOOT_HEADER_T *uBootHeader, BO
 
 					asm_jump_to_address(RAM2_BASE_ADDR + sizeof(BOOT_HEADER_T));
 
-		        		while(1);
-		        	}
+		        	while(1);
 		        }
-		        else
-		        {
+		    }
+		    else
+		    {
 				repeat = 2;
 				break;
-		        }
+		    }
+
+			/* Compare destAddr and codeSize after copy to the value we first read from the flash */
+			uBootHeader_ram_copy = (BOOT_HEADER_T *)destAddr;
+			destAddr_ram_copy = uBootHeader_ram_copy->header.destAddr;
+			codeSize_ram_copy = uBootHeader_ram_copy->header.codeSize;
+
+			if ((destAddr_ram_copy != destAddr) || (codeSize_ram_copy != codeSize))
+			{
+				serial_printf(KRED "\n>DRAM copy failure \n\n" KNRM);
+				return DEFS_STATUS_FAIL;
+			}
 		}
-
-
 	}
 
 		result = DEFS_STATUS_OK;
@@ -282,13 +295,15 @@ DEFS_STATUS      BOOTBLOCK_CheckImageCopyAndJump (BOOT_HEADER_T *uBootHeader, BO
 		/* i.(c) Jump to the destination address.                                                          */
 		/*-------------------------------------------------------------------------------------------------*/
 		if ( sigCheck == FALSE)
+		{
 			PCIMBX_UpdateMailbox(ST_ROM_BASIC_USE_IMAGE_SPI0_CS0_OFFSET0 + image); // Assuming image states are sequential
-
+		}
+		
 		BOOTBLOCK_Init_Before_Image_Check_Vendor();
 
 		if (bJump == TRUE)
 		{
-			BOOTBLOCK_JumpToUBOOT(uBootHeader, image);
+			BOOTBLOCK_JumpToUBOOT((BOOT_HEADER_T*)destAddr, image);
 		}
 	}
 
@@ -312,32 +327,18 @@ DEFS_STATUS      BOOTBLOCK_CheckImageCopyAndJump (BOOT_HEADER_T *uBootHeader, BO
 void	 BOOTBLOCK_JumpToUBOOT (BOOT_HEADER_T *uBootHeader, UINT8 image)
 {
 
-	if (uBootHeader->header.destAddr == 0)
-	{
-		PCIMBX_SetImageState(image, IMAGE_OK_RUN_FROM_FLASH);
+	PCIMBX_SetImageState(image, IMAGE_OK);
 
-		PCIMBX_Print();
+	PCIMBX_Print();
 
-		serial_printf("\n>Jump to uboot at 0x%x (XIP)\n", (UINT32)uBootHeader + sizeof(BOOT_HEADER_T));
+	serial_printf("\n>Jump to uboot at 0x%x\n", uBootHeader->header.destAddr);
+	/* clear the pipeline before jumping to image */
+	// __asm{ ISB; };
 
-		/* b. Else, jump to the SPI flash at offset 200h. (code was not copied. Run it from flash)*/
-		((volatile void(*)(void))(++uBootHeader))();
-		while(1);
-	}
-	else
-	{
-		PCIMBX_SetImageState(image, IMAGE_OK);
+	/* a. If destAddr != NULL,  jump to the code at offset 200h.*/
+	((volatile void(*)(void))(uBootHeader->header.destAddr + sizeof(BOOT_HEADER_T)))();
+	while(1);
 
-		PCIMBX_Print();
-
-		serial_printf("\n>Jump to uboot at 0x%x\n", uBootHeader->header.destAddr);
-		/* clear the pipeline before jumping to image */
-		// __asm{ ISB; };
-
-		/* a. If destAddr != NULL,  jump to the code at offset 200h.*/
-		((volatile void(*)(void))(uBootHeader->header.destAddr + sizeof(BOOT_HEADER_T)))();
-		while(1);
-	}
 }
 
 
@@ -417,9 +418,15 @@ DEFS_STATUS       BOOTBLOCK_CheckBBHeader_l (BOOT_HEADER_T *bbHeader, UINT8 imag
 /* Description:                                                                                            */
 /*                  Performs image header parameters validity check on the specified image                 */
 /*---------------------------------------------------------------------------------------------------------*/
-DEFS_STATUS       BOOTBLOCK_CheckUbootHeader_l (BOOT_HEADER_T *uBootHeader, UINT8 image)
+DEFS_STATUS       BOOTBLOCK_CheckUbootHeader_l (BOOT_HEADER_T *uBootHeader, UINT8 image, unsigned int *destAddr, unsigned int *codeSize)
 {
+    unsigned int endAddr;
 	const UINT8         startTag[START_TAG_SIZE] = START_TAG_ARR_UBOOT;
+
+	if ((uBootHeader == NULL) || (destAddr == NULL) || (codeSize == NULL))
+	{
+		return DEFS_STATUS_PARAMETER_OUT_OF_RANGE;
+	}
 
 	if ( ((UINT32)uBootHeader < SPI0CS0_BASE_ADDR) || ((UINT32)uBootHeader > (SPI0CS1_BASE_ADDR + FLASH_MEMORY_SIZE(1))))
 	{
@@ -428,9 +435,12 @@ DEFS_STATUS       BOOTBLOCK_CheckUbootHeader_l (BOOT_HEADER_T *uBootHeader, UINT
 		return DEFS_STATUS_PARAMETER_OUT_OF_RANGE;
 	}
 
+    *destAddr = uBootHeader->header.destAddr;
+    *codeSize = uBootHeader->header.codeSize;
+    endAddr = *destAddr + *codeSize;
 
 
-	/* — startTag (64-bit) = AA55_0750h, ‘BOOT’. */
+	/* — startTag (64-bit) = AA55_0750h, BOOT. */
 	if (memcmp(uBootHeader->header.startTag, startTag, START_TAG_SIZE) != 0)
 	{
 		PCIMBX_SetImageState(image, IMAGE_WRONG_START_TAG);
@@ -444,20 +454,36 @@ DEFS_STATUS       BOOTBLOCK_CheckUbootHeader_l (BOOT_HEADER_T *uBootHeader, UINT
 		return DEFS_STATUS_INVALID_DATA_FIELD;
 	}
 
-	/* When destAddr != NULL, the following restrictions apply: */
-	if (uBootHeader->header.destAddr != 0)
+
+	/*-------------------------------------------------------------------------------------------------*/
+	/* - destAddr must be 32-bit aligned.                                                              */
+	/*-------------------------------------------------------------------------------------------------*/
+	if ( (uBootHeader->header.destAddr & 0x00000003) != 0)
 	{
-		/*-------------------------------------------------------------------------------------------------*/
-		/* — destAddr must be 32-bit aligned.                                                              */
-		/*-------------------------------------------------------------------------------------------------*/
-		if ( (uBootHeader->header.destAddr & 0x00000003) != 0)
-		{
-			PCIMBX_SetImageState(image, IMAGE_DEST_ADDRESS_UNALIGNED);
-			serial_printf("\n>uboot : image is unaligned! dest address %#lx\n", uBootHeader->header.destAddr);
-			return DEFS_STATUS_INVALID_DATA_FIELD;
-		}
+		PCIMBX_SetImageState(image, IMAGE_DEST_ADDRESS_UNALIGNED);
+		serial_printf("\n>uboot : image is unaligned! dest address %#lx\n", uBootHeader->header.destAddr);
+		return DEFS_STATUS_INVALID_DATA_FIELD;
 	}
 
+	/*-------------------------------------------------------------------------------------------------*/
+	/* ? destAddr does not override the ROM global variables area (> Address FFFD_00FFh).              */
+	/* - destAddr does not override the ROM stack area                                                 */
+	/*-------------------------------------------------------------------------------------------------*/
+	if ((*destAddr > (SDRAM_BASE_ADDR + SDRAM_MAPPED_SIZE)) ||
+        (*destAddr < (SDRAM_BASE_ADDR + ARM_VECTOR_TABLE_SIZE)) ||
+	    (endAddr > (SDRAM_BASE_ADDR + SDRAM_MAPPED_SIZE)))
+	{
+	    PCIMBX_SetImageState(image, IMAGE_MEMORY_OVERLAP);
+	    serial_printf("\n>uboot : memory overlap! image ends outside of DDR %#lx %#lx\n", *destAddr, endAddr);
+	    return DEFS_STATUS_INVALID_DATA_SIZE;
+	}
+
+	if (*codeSize > MAX_CODE_SIZE)
+	{
+	    serial_printf("\n>uboot : image too big. size %#lx\n", uBootHeader->header.codeSize);
+	    PCIMBX_SetImageState(image, IMAGE_MEMORY_OVERLAP);
+	    return DEFS_STATUS_INVALID_DATA_SIZE;
+	}
 
 	return DEFS_STATUS_OK;
 }

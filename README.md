@@ -1,6 +1,6 @@
 ----------------------------------------------------------------------
  SPDX-License-Identifier: GPL-2.0                                     
- Copyright (c) 2010-2021 by Nuvoton Technology Corporation   
+ Copyright (c) 2010-2024 by Nuvoton Technology Corporation   
  All rights reserved       
 
  NPCM7XX (Poleg) BootBlock Release Letter 
@@ -8,8 +8,8 @@
 
 # NPCM7XX BootBlock Package
 Release Letter
-Version: 10.10.17
-Date:    Apr 2021
+Version: 10.10.19
+Date:    Mar 2024
 
 
 # PACKAGE CONTENTS
@@ -52,12 +52,12 @@ to flash via the IGPS (https://github.com/Nuvoton-Israel/igps) or other means.
 
 
 # ENHANCEMENTS
-----------------
-Bootblock 10.10.17
-==================
-- Add retries to DDR training.
-- Disable MC ECC interrupts.
-- Add memory tests at the end of the DDR training.
+------------
+Bootblock 10.10.19     Date: 27.03.24
+==================     ===============
+- uboot can only be loaded to DRAM from the range 0x100 till end of DRAM.
+- Avoid TOCTOU: read destination address and size only once.
+- Remove XIP.
 
 # FIXED ISSUES
 ------------
@@ -70,26 +70,43 @@ Bootblock 10.10.17
 
 
 # HISTORY
--------------------
-Bootblock 10.10.16
-==================
-- MC: Enhanced training optimization.
+----------------
+Bootblock 10.10.18     Date: 24.07.24
+==================     ===============
+- Add support for baud rate setting
+- supported baud rates 115200, 460800
 
-Bootblock 10.10.12
-==================
-- SPI0 frequency is now only limited to be up to 50MHz (remove 40MHz lower limit).
-  This check is only performed if PLLs are changes (RUN_BMC or new header frequency values).
-  
-Bootblock 10.10.11
-==================
+Bootblock 10.10.16     Date: 11.11.20
+==================     ===============
+- MC: start enhanced training in 0x14.
+- MC: when find a step in enhanced training, take +4 (was +2)
+
+Bootblock 10.10.15     Date: 22.10.20
+==================     ===============
+- MC: add option to change enhanced training range.
+- MC: Change default enhanced training range to [0x16:0x28].
+- MC: minimum DQS eye is 30.
+- MC: in enhanced training sweep only in DQS, not out DQS.
+
+Bootblock 10.10.13     Date: 19.10.20
+==================     ===============
+- MC: add option to override DQS in and out init values from header.
+
+Bootblock 10.10.11     Date: 26.11.19 
+==================     ===============
 - Fix an issue in INTCR3 settings (FIU_FIX field).
 
-Bootblock 10.10.10
-==================
+Bootblock 10.10.12     Date: 21.07.20
+==================     ===============
+- SPI0 frequency is now only limited to be up to 50MHz (remove 40MHz lower limit).
+  This check is only performed if PLLs are changes (RUN_BMC or new header frequency values).
+
+Bootblock 10.10.10     Date: 17.11.19 
+==================     ===============
 - MC: in enhanced training: change the sweep range accrording to the location of the step. (run time optimization)
 
-Bootblock 10.10.09
-==================
+Bootblock 10.10.09     Date: 27.10.19 
+==================     ===============
 - CLK: fix an issue when setting MC and CPU clocks to different values (using the header).
 - eSPI: init only on PORST. 
 

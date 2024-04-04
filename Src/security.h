@@ -19,7 +19,7 @@
 #include "shared_defs.h"
 
 
-DEFS_STATUS         BOOTBLOCK_CheckUbootHeader_l   (BOOT_HEADER_T *uBootHeader, UINT8 image);
+DEFS_STATUS         BOOTBLOCK_CheckUbootHeader_l   (BOOT_HEADER_T *uBootHeader, UINT8 image, unsigned int *destAddr, unsigned int *codeSize);
 DEFS_STATUS         BOOTBLOCK_CheckBBHeader_l      (BOOT_HEADER_T *bbHeader, UINT8 image);
 
 

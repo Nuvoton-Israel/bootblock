@@ -664,10 +664,10 @@ void bootblock_main (void)
 #if (defined __ARMCC_VERSION) && (__ARMCC_VERSION >= 5040049)
 #pragma push
 #pragma diag_suppress 2748
-		memcpy((void*)SDRAM_BASE_ADDR, (void*)ROM_BASE_ADDR, 0x100);
+		memcpy((void*)SDRAM_BASE_ADDR, (void*)ROM_BASE_ADDR, ARM_VECTOR_TABLE_SIZE);
 #pragma pop
 #else
-		memcpy((void*)SDRAM_BASE_ADDR, (void*)ROM_BASE_ADDR, 0x100);
+		memcpy((void*)SDRAM_BASE_ADDR, (void*)ROM_BASE_ADDR, ARM_VECTOR_TABLE_SIZE);
 #endif
 
 		disable_highvecs();
